@@ -1,0 +1,185 @@
+/* ============================================================
+   JDB Parts Admin – dashboard.css
+   ============================================================ */
+
+/* 1. Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    background: #f0f2f5;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+}
+
+/* 2. Sidebar
+   ============================================================ */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    background: #1e1e2d;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    transition: width 0.3s ease, padding 0.3s ease;
+    z-index: 1050;
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Collapsed state (desktop) */
+.sidebar.collapsed {
+    width: 72px;
+    padding: 1.5rem 0.6rem;
+}
+.sidebar.collapsed .logo-text,
+.sidebar.collapsed .nav-link span {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.sidebar.collapsed .nav-link {
+    justify-content: center;
+    padding: 0.65rem 0;
+}
+
+/* Logo */
+.sidebar .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 0.25rem 0.5rem 1.5rem;
+    white-space: nowrap;
+}
+.sidebar .logo i { font-size: 1.5rem; color: #667eea; flex-shrink: 0; }
+
+/* Nav links */
+.sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.5rem;
+    color: rgba(255,255,255,0.6);
+    font-size: 0.93rem;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.sidebar .nav-link i { font-size: 1.15rem; flex-shrink: 0; }
+.sidebar .nav-link:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+}
+.sidebar .nav-link.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+}
+
+/* 3. Overlay (mobile)
+   ============================================================ */
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 4. Main content
+   ============================================================ */
+.main-content {
+    margin-left: 260px;
+    padding: 1.75rem;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+.main-content.expanded {
+    margin-left: 72px;
+}
+
+/* 5. Mobile overrides
+   ============================================================ */
+@media (max-width: 991.98px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: 260px;
+        padding: 1.5rem 1rem;
+    }
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    .main-content {
+        margin-left: 0 !important;
+    }
+}
+
+/* 6. Cards
+   ============================================================ */
+.stat-card,
+.chart-card,
+.total-sales-card {
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover,
+.chart-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.total-sales-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+}
+.total-sales-card h6,
+.total-sales-card h2,
+.total-sales-card small { color: #fff !important; opacity: 1; }
+.total-sales-card small { opacity: 0.85; }
+
+/* 7. Header
+   ============================================================ */
+.top-header {
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0.5rem;
+    z-index: 1000;
+}
+
+/* 8. Badges & progress
+   ============================================================ */
+.badge-status { min-width: 95px; text-align: center; }
+.progress { height: 6px; border-radius: 3px; }
+
+/* 9. Table tweaks
+   ============================================================ */
+.table td, .table th { vertical-align: middle; }
+
+/* 10. Toast notifications
+    ============================================================ */
+.toast-container {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+}
