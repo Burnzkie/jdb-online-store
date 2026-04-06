@@ -577,10 +577,6 @@ $memberSince = isset($user['created_at']) ? date('F Y', strtotime($user['created
                 <span class="nav-icon"><i class="fas fa-user-cog"></i></span>
                 Account Settings
             </a>
-            <a href="../auth/logout.php" style="color: #e02424 !important;">
-                <span class="nav-icon" style="color:#e02424;"><i class="fas fa-sign-out-alt"></i></span>
-                Logout
-            </a>
         </nav>
     </aside>
 
