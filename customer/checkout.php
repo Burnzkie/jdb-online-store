@@ -49,25 +49,50 @@ if (empty($cartItems)) {
 // ── Filter by selected product IDs passed from cart.php (?selected=1,2,3) ──
 $selectedIds = [];
 if (!empty($_GET['selected'])) {
-    $selectedIds = array_values(array_filter(
+    $selectedIds = array_filter(
         array_map('intval', explode(',', $_GET['selected']))
-    ));
+    );
+}
+if (!empty ($selectedIds)){
+    $cartItems = array_filter($cartItems, function($item) use ($selectedIds){
+        return in_array((int)$item['product_id'], $selectedIds, true);
+    });
+    $cartItems = array_values($cartItems);
 }
 
-// If specific items selected, keep only those; otherwise show all
+// ── Read quantity overrides from cart steppers (?qtys=2,1,3) ──
+// Positions map 1-to-1 with $selectedIds
+$qtyOverrides = [];
+if (!empty($_GET['qtys']) && !empty($selectedIds)) {
+    $rawQtys = array_map('intval', explode(',', $_GET['qtys']));
+    foreach ($selectedIds as $idx => $pid) {
+        $q = isset($rawQtys[$idx]) ? max(1, $rawQtys[$idx]) : 1;
+        $qtyOverrides[$pid] = $q;
+    }
+}
+
+// Keep only selected items; fall back to full cart if nothing matched
 if (!empty($selectedIds)) {
     $cartItems = array_values(array_filter(
         $cartItems,
         fn($i) => in_array((int)$i['product_id'], $selectedIds, true)
     ));
 }
-
-// Fallback: if filtering wiped everything, revert to full cart
 if (empty($cartItems)) {
     $cartItems = $cartService->getCartItems();
 }
 
-// Recalculate totals for selected items only
+// Apply quantity overrides and recalculate per-line totals
+foreach ($cartItems as &$item) {
+    $pid = (int)$item['product_id'];
+    if (isset($qtyOverrides[$pid])) {
+        $item['quantity']   = $qtyOverrides[$pid];
+        $item['line_total'] = round($item['price'] * $item['quantity'], 2);
+    }
+}
+unset($item);
+
+// Recalculate totals for the selected items only
 $subtotal   = (float) array_sum(array_column($cartItems, 'line_total'));
 $grandTotal = $subtotal + CHECKOUT_SHIPPING;
 
@@ -114,8 +139,9 @@ $defaultPhone     = $userDefaults['phone']     ?? '';
 
             <form action="process-order.php" method="post" id="checkoutForm" class="needs-validation" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                <!-- Pass selected product IDs to process-order.php -->
+                <!-- Pass selected product IDs + quantities to process-order.php -->
                 <input type="hidden" name="selected_items" value="<?= htmlspecialchars(implode(',', array_column($cartItems, 'product_id'))) ?>">
+                <input type="hidden" name="selected_qtys"  value="<?= htmlspecialchars(implode(',', array_column($cartItems, 'quantity'))) ?>">
 
                 <!-- Shipping Information -->
                 <div class="card checkout-card mb-4">

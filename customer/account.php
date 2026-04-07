@@ -559,25 +559,7 @@ $memberSince = isset($user['created_at']) ? date('F Y', strtotime($user['created
                 Member since <?= $memberSince ?>
             </div>
         </div>
-        <nav class="sidebar-nav">
-            <a href="dashboard.php">
-                <span class="nav-icon"><i class="fas fa-tachometer-alt"></i></span>
-                Dashboard
-            </a>
-            <a href="orders.php">
-                <span class="nav-icon"><i class="fas fa-shopping-bag"></i></span>
-                My Orders
-            </a>
-            <a href="cart.php">
-                <span class="nav-icon"><i class="fas fa-shopping-cart"></i></span>
-                My Cart
-            </a>
-            <div class="divider"></div>
-            <a href="account.php" class="active">
-                <span class="nav-icon"><i class="fas fa-user-cog"></i></span>
-                Account Settings
-            </a>
-        </nav>
+        
     </aside>
 
     <!-- ── Main Content ── -->

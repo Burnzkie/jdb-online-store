@@ -80,6 +80,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="../../assets/css/dashboard.css">
+    
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f5f7ff; }
@@ -93,7 +94,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 <nav class="sidebar" id="sidebar">
     <div class="d-flex justify-content-between align-items-center mb-5">
         <div class="logo d-flex align-items-center gap-3 text-light">
-            <i class="bi bi-tools fs-4"></i>
+            <i class="bi bi-shop-window fs-4"></i>
             <span>JDB Parts Staff</span>
         </div>
         <button class="btn btn-sm text-muted d-lg-none" id="closeSidebar" aria-label="Close sidebar">&times;</button>

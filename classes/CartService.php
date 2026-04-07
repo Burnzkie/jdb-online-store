@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 class CartService
 {
     private PDO $pdo;
@@ -18,7 +17,6 @@ class CartService
 
     /**
      * Add (or increment) a product.
-     * Returns ['success' => bool, 'message' => string].
      */
     public function addItem(int $productId, int $quantity = 1): array
     {
@@ -46,14 +44,14 @@ class CartService
         return [
             'success' => true,
             'message' => $adjusted
-                ? "Quantity adjusted to available stock ({$product['stock']}) for '{$product['name']}'."
+                ? "Added to cart. Quantity adjusted to available stock ({$capped}) for '{$product['name']}'."
                 : "'{$product['name']}' added to cart.",
         ];
     }
 
     /**
-     * Set an item to an exact quantity.
-     * qty ≤ 0 removes the item.
+     * Update quantity of an item (main method used by auto-save)
+     * qty <= 0 will remove the item.
      */
     public function updateItem(int $productId, int $quantity): array
     {
@@ -79,10 +77,12 @@ class CartService
         $this->syncSessionFromDb();
 
         return [
-            'success' => !$adjusted,
+            'success' => true,                    // Always return true for AJAX (we saved what we could)
+            'adjusted' => $adjusted,
             'message' => $adjusted
-                ? "'{$product['name']}' quantity adjusted to stock ({$product['stock']})."
-                : 'Cart updated.',
+                ? "'{$product['name']}' quantity adjusted to {$capped} due to stock limit."
+                : 'Quantity updated successfully.',
+            'new_quantity' => $capped
         ];
     }
 
@@ -95,9 +95,7 @@ class CartService
 
     public function clear(): void
     {
-        if ($this->userId === 0) {
-            return;
-        }
+        if ($this->userId === 0) return;
         $this->pdo->prepare("DELETE FROM cart_items WHERE user_id = ?")->execute([$this->userId]);
         $_SESSION['cart'] = [];
     }
@@ -106,9 +104,7 @@ class CartService
 
     public function getItemCount(): int
     {
-        if ($this->userId === 0) {
-            return 0;
-        }
+        if ($this->userId === 0) return 0;
         $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM cart_items WHERE user_id = ?");
         $stmt->execute([$this->userId]);
         return (int)$stmt->fetchColumn();
@@ -119,18 +115,15 @@ class CartService
         return $this->getItemCount() === 0;
     }
 
-    /** Full cart rows joined with live product data. */
     public function getCartItems(): array
     {
-        if ($this->userId === 0) {
-            return [];
-        }
+        if ($this->userId === 0) return [];
 
         $stmt = $this->pdo->prepare("
             SELECT ci.product_id, ci.quantity,
                    p.name, p.price, p.sale_price, p.stock, p.image
             FROM   cart_items ci
-            JOIN   products   p  ON p.id = ci.product_id
+            JOIN   products p ON p.id = ci.product_id
             WHERE  ci.user_id = ? AND p.is_active = 1
             ORDER BY ci.created_at ASC
         ");
@@ -140,6 +133,7 @@ class CartService
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $qty   = (int)$row['quantity'];
             $price = (float)($row['sale_price'] ?: $row['price']);
+
             $items[] = [
                 'product_id' => (int)$row['product_id'],
                 'name'       => $row['name'],
@@ -153,28 +147,24 @@ class CartService
         return $items;
     }
 
-    public function calculateTotals(float $shipping = 0.0): array
+    public function calculateTotals(float $shipping = 150.0): array
     {
-        $subtotal = array_sum(array_column($this->getCartItems(), 'line_total'));
+        $items    = $this->getCartItems();
+        $subtotal = array_sum(array_column($items, 'line_total'));
+
         return [
             'subtotal'   => round($subtotal, 2),
             'shipping'   => $shipping,
             'total'      => round($subtotal + $shipping, 2),
-            'item_count' => $this->getItemCount(),
+            'item_count' => count($items),
         ];
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
-    /**
-     * Sets $out to an error array if the user is not logged in.
-     * Returns true if logged in, false otherwise.
-     */
     private function assertLoggedIn(?array &$out): bool
     {
-        if ($this->userId !== 0) {
-            return true;
-        }
+        if ($this->userId !== 0) return true;
         $out = ['success' => false, 'message' => 'Please log in to manage your cart.'];
         return false;
     }
@@ -182,10 +172,10 @@ class CartService
     private function fetchActiveProduct(int $productId): ?array
     {
         $stmt = $this->pdo->prepare("
-            SELECT id, name, price, sale_price, stock, image
-            FROM   products
-            WHERE  id = ? AND is_active = 1
-            LIMIT  1
+            SELECT id, name, price, sale_price, stock 
+            FROM products 
+            WHERE id = ? AND is_active = 1 
+            LIMIT 1
         ");
         $stmt->execute([$productId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -205,7 +195,9 @@ class CartService
         $this->pdo->prepare("
             INSERT INTO cart_items (user_id, product_id, quantity, updated_at)
             VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), updated_at = NOW()
+            ON DUPLICATE KEY UPDATE 
+                quantity = VALUES(quantity), 
+                updated_at = NOW()
         ")->execute([$this->userId, $productId, $quantity]);
     }
 
@@ -216,16 +208,18 @@ class CartService
         )->execute([$this->userId, $productId]);
     }
 
-    /** Keep $_SESSION['cart'] in sync so legacy checkout code still works. */
+    /**
+     * Keep $_SESSION['cart'] in sync (important for process-order.php and buy-now.php)
+     */
     private function syncSessionFromDb(): void
     {
-        if ($this->userId === 0) {
-            return;
-        }
+        if ($this->userId === 0) return;
+
         $stmt = $this->pdo->prepare(
             "SELECT product_id, quantity FROM cart_items WHERE user_id = ?"
         );
         $stmt->execute([$this->userId]);
+
         $_SESSION['cart'] = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $_SESSION['cart'][(int)$row['product_id']] = (int)$row['quantity'];

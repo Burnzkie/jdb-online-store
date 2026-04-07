@@ -122,6 +122,42 @@ if (empty($cart)) {
     redirectWithError('Your cart is empty.', 'cart.php');
 }
 
+// ── Resolve selected items + quantity overrides from checkout ──
+// selected_items and selected_qtys are parallel comma-separated lists
+// injected by checkout.php as hidden form fields.
+$selectedItems = [];
+if (!empty($_POST['selected_items'])) {
+    $selectedItems = array_values(array_filter(
+        array_map('intval', explode(',', $_POST['selected_items']))
+    ));
+}
+
+$qtyOverrides = [];   // [ product_id => quantity ]
+if (!empty($_POST['selected_qtys']) && !empty($selectedItems)) {
+    $rawQtys = array_map('intval', explode(',', $_POST['selected_qtys']));
+    foreach ($selectedItems as $idx => $pid) {
+        $q = isset($rawQtys[$idx]) ? max(1, $rawQtys[$idx]) : 1;
+        $qtyOverrides[$pid] = $q;
+    }
+}
+
+// Build the working cart: only selected products, with overridden quantities
+if (!empty($selectedItems)) {
+    $workingCart = [];
+    foreach ($selectedItems as $pid) {
+        // $_SESSION['cart'] keys are always strings after serialisation;
+        // cast to string so array_key_exists matches correctly.
+        $key = (string)$pid;
+        if (array_key_exists($key, $cart)) {
+            $workingCart[$pid] = $qtyOverrides[$pid] ?? $cart[$key];
+        }
+    }
+    if (empty($workingCart)) {
+        redirectWithError('None of the selected items were found in your cart.', 'cart.php');
+    }
+    $cart = $workingCart;
+}
+
 try {
     $pdo->beginTransaction();
 
@@ -151,20 +187,20 @@ try {
         $quantity = (int)$quantity;
 
         if (!isset($productMap[$productId])) {
-            unset($_SESSION['cart'][$productId]);
+            unset($cart[$productId]);
             continue;
         }
 
         $product = $productMap[$productId];
 
         if ($quantity < 1) {
-            unset($_SESSION['cart'][$productId]);
+            unset($cart[$productId]);
             continue;
         }
 
         if ($quantity > $product['stock']) {
             $stockIssues[] = "{$product['name']} (only {$product['stock']} available)";
-            unset($_SESSION['cart'][$productId]);
+            unset($cart[$productId]);
             continue;
         }
 
@@ -187,7 +223,6 @@ try {
 
     if (empty($validItems)) {
         $pdo->rollBack();
-        unset($_SESSION['cart']);
         redirectWithError('No valid items remain in your cart.', 'cart.php');
     }
 
@@ -318,8 +353,14 @@ try {
 
     $pdo->commit();
 
-    // Clear cart
-    unset($_SESSION['cart']);
+    // Remove only the ordered items from the session cart.
+    // Items the customer left unchecked stay in the cart.
+    foreach (array_keys($cart) as $pid) {
+        unset($_SESSION['cart'][$pid]);
+    }
+    if (empty($_SESSION['cart'])) {
+        unset($_SESSION['cart']);
+    }
 
     // Clear rate-limit counter on success
     if (function_exists('apcu_delete')) {

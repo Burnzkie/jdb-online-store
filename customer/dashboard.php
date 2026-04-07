@@ -53,6 +53,7 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good
     <title>Dashboard — JDB Parts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -160,7 +161,7 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good
 
 <nav class="top-nav">
     <a href="dashboard.php" class="brand">
-        <span class="brand-icon"><i class="fas fa-car-side"></i></span>
+        <span class="brand-icon"><i class="bi bi-shop-window"></i></span>
         JDB Parts
     </a>
     <div class="nav-links">
@@ -233,7 +234,7 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good
     </div>
 
     <div class="row g-4">
-        <div class="col-lg-8">
+        <div class="col-lg-12">
             <!-- Recent Orders -->
             <div class="section-card">
                 <div class="section-head">
@@ -288,46 +289,6 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <!-- Quick Actions -->
-            <div class="section-card mb-4">
-                <div class="section-head"><span class="section-title">Quick Actions</span></div>
-                <div style="padding:16px;">
-                    <div class="quick-grid">
-                        <a href="products.php" class="quick-card"><i class="fas fa-store"></i><span>Shop</span></a>
-                        <a href="cart.php"     class="quick-card"><i class="fas fa-cart-shopping"></i><span>Cart</span></a>
-                        <a href="orders.php"   class="quick-card"><i class="fas fa-box"></i><span>Orders</span></a>
-                        <a href="account.php"  class="quick-card"><i class="fas fa-user-cog"></i><span>Profile</span></a>
-                        <a href="account.php#password" class="quick-card"><i class="fas fa-lock"></i><span>Password</span></a>
-                        <a href="../auth/logout.php" class="quick-card" style="color:var(--danger)"><i class="fas fa-sign-out-alt" style="color:var(--danger)"></i><span>Logout</span></a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Account Snapshot -->
-            <div class="section-card">
-                <div class="section-head"><span class="section-title">My Account</span></div>
-                <div style="padding:16px 20px;">
-                    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-                        <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#4f8ef7);display:flex;align-items:center;justify-content:center;font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;flex-shrink:0;">
-                            <?= htmlspecialchars($initials) ?>
-                        </div>
-                        <div>
-                            <p style="font-weight:700;margin:0;font-size:.9rem"><?= htmlspecialchars($fullName) ?></p>
-                            <p style="color:var(--muted);font-size:.78rem;margin:2px 0 0;"><?= htmlspecialchars($user['email'] ?? '') ?></p>
-                            <?php if (!empty($user['phone'])): ?>
-                            <p style="color:var(--muted);font-size:.78rem;margin:1px 0 0;"><?= htmlspecialchars($user['phone']) ?></p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <a href="account.php" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:9px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);text-decoration:none;font-size:.82rem;font-weight:600;color:var(--text);transition:.15s;"
-                       onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'"
-                       onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">
-                        <i class="fas fa-pencil-alt"></i> Edit Profile
-                    </a>
-                </div>
-            </div>
-        </div>
     </div>
 
 </div>

@@ -1,7 +1,7 @@
 <nav class="navbar navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
         <a class="navbar-brand" href="dashboard.php">
-            <i class="fas fa-tools"></i> JDB Parts - Staff Panel
+            <i class="bi bi-shop-window"></i> JDB Parts - Staff Panel
         </a>
         <div class="d-flex">
             <span class="navbar-text me-3 text-white">
