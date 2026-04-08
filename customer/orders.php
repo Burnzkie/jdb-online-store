@@ -36,6 +36,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>My Orders — JDB Parts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root{--primary:#1a56db;--primary-dark:#1344b4;--primary-soft:#eff4ff;--success:#0e9f6e;--success-soft:#f0fdf9;--danger:#e02424;--danger-soft:#fff5f5;--warning:#d97706;--warning-soft:#fffbeb;--surface:#fff;--bg:#f4f6fb;--border:#e5e9f2;--text:#111827;--muted:#6b7280;--radius:14px;--radius-sm:9px;}
@@ -103,7 +104,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
 
 <nav class="top-nav">
-    <a href="dashboard.php" class="brand"><span class="brand-icon"><i class="fas fa-car-side"></i></span>JDB Parts</a>
+    <a href="dashboard.php" class="brand"><span class="brand-icon"><i class="bi bi-shop-window"></i></span>JDB Parts</a>
     <div class="nav-links">
         <a href="dashboard.php"><i class="fas fa-home"></i> <span>Home</span></a>
         <a href="products.php"><i class="fas fa-store"></i> <span>Shop</span></a>

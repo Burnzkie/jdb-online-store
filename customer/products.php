@@ -72,6 +72,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>Products - JDB Parts</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
         body { background: #f5f7fa; }
 
@@ -140,7 +141,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
     <div class="container">
         <a class="navbar-brand fw-bold text-primary" href="dashboard.php">
-            <i class="fas fa-car-side me-2"></i>JDB Parts
+           <i class="bi bi-shop-window"></i> JDB Parts
         </a>
         <div class="d-flex align-items-center gap-3">
             <a href="cart.php" class="btn btn-outline-primary position-relative">
