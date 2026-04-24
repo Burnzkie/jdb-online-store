@@ -1,0 +1,6 @@
+{
+    "require": {
+        "paymongo/paymongo-php": "^0.0.0",
+        "phpmailer/phpmailer": "^7.0"
+    }
+}
