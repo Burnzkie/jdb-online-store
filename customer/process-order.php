@@ -352,6 +352,61 @@ try {
     }
 
     $pdo->commit();
+            // Add this AFTER the $pdo->commit() in process-order.php
+        // Replace the current redirect logic
+
+        if (in_array($formData['payment'], ['gcash', 'maya'], true)) {
+            require_once '../classes/PaymentService.php';
+            $paymentService = new PaymentService();
+
+            $method = $formData['payment'] === 'gcash'
+                ? 'createGcashPayment'
+                : 'createMayaPayment';
+
+            $payResult = $paymentService->$method(
+                $grandTotal,
+                (string)$orderId,
+                $orderNumber,
+                $formData['email'],
+                $formData['full_name']
+            );
+
+            if ($payResult['success']) {
+                // Store session ID so webhook can match it to the order
+                $pdo->prepare("UPDATE orders SET payment_session_id = ? WHERE id = ?")
+                    ->execute([$payResult['session_id'], $orderId]);
+
+                header("Location: " . $payResult['checkout_url']);
+                exit;
+            } else {
+                // Payment session failed — cancel the order
+                $pdo->prepare("UPDATE orders SET status = 'cancelled', notes = 'Payment session failed' WHERE id = ?")
+                    ->execute([$orderId]);
+                redirectWithError('Unable to initiate payment. Please try again or choose COD.');
+            }
+        }
+
+        // COD orders go straight to confirmation
+        header("Location: order-confirmation.php?order_id=$orderId");
+        exit;
+
+                    // After successful order creation
+            try {
+                require_once '../classes/EmailService.php';
+                $emailService = new EmailService();
+                $emailService->sendOrderConfirmation(
+                    $formData['email'],
+                    $formData['full_name'],
+                    $orderNumber,
+                    $grandTotal,
+                    $validItems,
+                    $formData['shipping_address'],
+                    $formData['payment']
+                );
+            } catch (Exception $e) {
+                error_log("Order confirmation email failed: " . $e->getMessage());
+                // Don't fail the order just because email failed
+            }
 
     // Remove only the ordered items from the session cart.
     // Items the customer left unchecked stay in the cart.

@@ -26,6 +26,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     header('Location: orders.php?msg=' . urlencode('Order status updated.'));
     exit;
 }
+        // After $orderModel->updateStatus($orderId, $status)
+        if ($status === 'shipped') {
+            require_once '../classes/EmailService.php';
+            $emailService = new EmailService();
+            // Fetch customer email from order
+            $orderData = $orderModel->getOrderById($orderId);
+            if ($orderData) {
+                $emailService->sendShippingUpdate(
+                    $orderData['customer_email'] ?? $orderData['user_email'],
+                    $orderData['customer_name']  ?? $orderData['user_fullname'],
+                    $orderData['order_number'],
+                    'shipped'
+                );
+            }
+        }
 
 $message   = urldecode($_GET['msg'] ?? '');
 $allOrders = $orderObj->getAllOrders();

@@ -191,33 +191,56 @@ $defaultPhone     = $userDefaults['phone']     ?? '';
                                        maxlength="20" required>
                                 <div class="invalid-feedback">Please enter a valid phone number.</div>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label">
-                                    Complete Shipping Address <span class="required-mark">*</span>
-                                </label>
-                                <textarea class="form-control" name="shipping_address"
-                                          rows="4" maxlength="500"
-                                          placeholder="Street, Barangay, City, Province, Postal Code"
-                                          required></textarea>
-                                <div class="invalid-feedback">Please enter your shipping address.</div>
-                                <small class="text-muted">Include street, barangay, city, province, and postal code.</small>
-                            </div>
+                            <!-- Replace the shipping_address textarea with this -->
+                                <div class="col-12">
+                                    <label class="form-label">Street Address <span class="required-mark">*</span></label>
+                                    <input type="text" class="form-control" name="street_address"
+                                        placeholder="House/Unit No., Street Name" required>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Province <span class="required-mark">*</span></label>
+                                    <select class="form-select" id="province-select" name="province" required>
+                                        <option value="">Loading provinces...</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">City / Municipality <span class="required-mark">*</span></label>
+                                    <select class="form-select" id="city-select" name="city" required disabled>
+                                        <option value="">Select province first</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Barangay <span class="required-mark">*</span></label>
+                                    <select class="form-select" id="barangay-select" name="barangay" required disabled>
+                                        <option value="">Select city first</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Postal Code</label>
+                                    <input type="text" class="form-control" name="postal_code"
+                                        placeholder="e.g. 1234" maxlength="10">
+                                </div>
+
+                                <!-- Hidden combined address for process-order.php -->
+                                <input type="hidden" name="shipping_address" id="combined-address">
+                        <!-- Add shipping display -->
+                        <div id="shipping-display" class="alert alert-info mt-3">
+                            <i class="fas fa-truck me-2"></i>
+                            Shipping fee: <strong id="shipping-fee">₱150.00</strong>
+                            <small class="d-block text-muted">Enter your province to see exact rate</small>
+                        </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Payment Method -->
-                <div class="card checkout-card mb-4">
-                    <div class="card-header bg-light border-0 py-3">
-                        <h5 class="mb-0">
-                            <i class="fas fa-credit-card me-2 text-primary"></i>
-                            Payment Method
-                        </h5>
-                    </div>
-                    <div class="card-body p-4">
+                                        <!-- Payment Method section -->
                         <div class="form-check mb-3 p-3 border rounded">
                             <input class="form-check-input" type="radio"
-                                   name="payment_method" id="cod" value="cod" checked required>
+                                name="payment_method" id="cod" value="cod" checked required>
                             <label class="form-check-label w-100" for="cod">
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-money-bill-wave fa-2x text-success me-3"></i>
@@ -228,21 +251,34 @@ $defaultPhone     = $userDefaults['phone']     ?? '';
                                 </div>
                             </label>
                         </div>
-                        <div class="form-check p-3 border rounded opacity-50">
+
+                        <div class="form-check mb-3 p-3 border rounded">
                             <input class="form-check-input" type="radio"
-                                   name="payment_method" id="gcash" value="gcash" disabled>
+                                name="payment_method" id="gcash" value="gcash" required>
                             <label class="form-check-label w-100" for="gcash">
                                 <div class="d-flex align-items-center">
-                                    <i class="fas fa-mobile-alt fa-2x text-primary me-3"></i>
+                                    <img src="../assets/img/gcash.png" width="40" class="me-3" alt="GCash">
                                     <div>
                                         <strong>GCash</strong>
-                                        <p class="mb-0 small text-muted">Coming soon</p>
+                                        <p class="mb-0 small text-muted">Pay via GCash mobile wallet</p>
                                     </div>
                                 </div>
                             </label>
                         </div>
-                    </div>
-                </div>
+
+                        <div class="form-check mb-3 p-3 border rounded">
+                            <input class="form-check-input" type="radio"
+                                name="payment_method" id="maya" value="maya" required>
+                            <label class="form-check-label w-100" for="maya">
+                                <div class="d-flex align-items-center">
+                                    <img src="../assets/img/maya.png" width="40" class="me-3" alt="Maya">
+                                    <div>
+                                        <strong>Maya (PayMaya)</strong>
+                                        <p class="mb-0 small text-muted">Pay via Maya e-wallet</p>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
 
                 <!-- Order Notes -->
                 <div class="card checkout-card mb-4">
@@ -364,6 +400,101 @@ $defaultPhone     = $userDefaults['phone']     ?? '';
         }
         form.classList.add('was-validated');
     }, false);
+
+            // Add to checkout.php <script>
+        document.getElementById('province').addEventListener('input', function() {
+            const province = this.value;
+            if (province.length < 3) return;
+
+            fetch('ajax/get-shipping-rate.php?province=' + encodeURIComponent(province))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.rate) {
+                        document.getElementById('shipping-fee').textContent =
+                            '₱' + parseFloat(data.rate).toLocaleString('en-PH', {minimumFractionDigits: 2});
+                    }
+                });
+        });
+
+                                            // Add to checkout.php <script>
+            // Load provinces on page load
+            fetch('ajax/get-provinces.php')
+                .then(r => r.json())
+                .then(provinces => {
+                    const sel = document.getElementById('province-select');
+                    sel.innerHTML = '<option value="">Select Province</option>';
+                    provinces.forEach(p => {
+                        sel.innerHTML += `<option value="${p.name}" data-code="${p.code}">${p.name}</option>`;
+                    });
+                });
+
+            // Load cities when province changes
+            document.getElementById('province-select').addEventListener('change', function() {
+                const option   = this.options[this.selectedIndex];
+                const code     = option.dataset.code;
+                const citySel  = document.getElementById('city-select');
+                const barSel   = document.getElementById('barangay-select');
+
+                citySel.disabled = true;
+                citySel.innerHTML = '<option value="">Loading...</option>';
+                barSel.innerHTML  = '<option value="">Select city first</option>';
+                barSel.disabled   = true;
+
+                if (!code) return;
+
+                fetch('ajax/get-cities.php?province_code=' + code)
+                    .then(r => r.json())
+                    .then(cities => {
+                        citySel.innerHTML = '<option value="">Select City/Municipality</option>';
+                        cities.forEach(c => {
+                            citySel.innerHTML += `<option value="${c.name}" data-code="${c.code}">${c.name}</option>`;
+                        });
+                        citySel.disabled = false;
+                    });
+                updateCombinedAddress();
+            });
+
+            // Load barangays when city changes
+            document.getElementById('city-select').addEventListener('change', function() {
+                const option  = this.options[this.selectedIndex];
+                const code    = option.dataset.code;
+                const barSel  = document.getElementById('barangay-select');
+
+                barSel.disabled = true;
+                barSel.innerHTML = '<option value="">Loading...</option>';
+
+                if (!code) return;
+
+                fetch('ajax/get-barangays.php?city_code=' + code)
+                    .then(r => r.json())
+                    .then(barangays => {
+                        barSel.innerHTML = '<option value="">Select Barangay</option>';
+                        barangays.forEach(b => {
+                            barSel.innerHTML += `<option value="${b.name}">${b.name}</option>`;
+                        });
+                        barSel.disabled = false;
+                    });
+                updateCombinedAddress();
+            });
+
+            document.getElementById('barangay-select').addEventListener('change', updateCombinedAddress);
+
+            // Combine all address fields into one hidden input before submit
+            function updateCombinedAddress() {
+                const street   = document.querySelector('[name="street_address"]')?.value ?? '';
+                const barangay = document.getElementById('barangay-select')?.value ?? '';
+                const city     = document.getElementById('city-select')?.value ?? '';
+                const province = document.getElementById('province-select')?.value ?? '';
+                const postal   = document.querySelector('[name="postal_code"]')?.value ?? '';
+
+                document.getElementById('combined-address').value =
+                    [street, barangay, city, province, postal].filter(Boolean).join(', ');
+            }
+
+            // Update combined address before form submits
+            document.getElementById('checkoutForm').addEventListener('submit', function() {
+                updateCombinedAddress();
+            });
 
     // Strip non-phone chars as user types
     const phoneInput = document.querySelector('input[name="phone"]');
