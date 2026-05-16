@@ -19,9 +19,18 @@ $pdo = Database::getInstance()->getConnection();
 $cartService = new CartService($pdo);
 $cartCount   = $cartService->getItemCount();
 
-// ────────────────────────────────────────────────
-//  Pagination & Search
-// ────────────────────────────────────────────────
+// fixed: fetch user data for navbar avatar/dropdown
+$userId = (int)$_SESSION['user_id'];
+$stmt   = $pdo->prepare("SELECT firstname, lastname, email FROM users WHERE id = ? LIMIT 1");
+$stmt->execute([$userId]);
+$user     = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+$initials = strtoupper(
+    substr($user['firstname'] ?? 'U', 0, 1) .
+    substr($user['lastname']  ?? '',  0, 1)
+);
+
+// Pagination & Search
 $page    = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 12;
 $offset  = ($page - 1) * $perPage;
@@ -35,7 +44,6 @@ if ($search !== '') {
     $params[] = "%$search%";
 }
 
-// Total count
 $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM products $where");
 $totalStmt->execute($params);
 $totalProducts = (int)$totalStmt->fetchColumn();
@@ -47,7 +55,6 @@ if ($page > $totalPages && $totalPages > 0) {
     exit;
 }
 
-// Fetch products
 $stmt = $pdo->prepare("
     SELECT p.*, c.name AS category_name
     FROM products p
@@ -74,8 +81,110 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
-        body { background: #f5f7fa; }
+        /* ── CSS Variables ──────────────────────────────── */
+        :root {
+            --primary:  #1a56db;
+            --surface:  #fff;
+            --bg:       #f4f6fb;
+            --border:   #e5e9f2;
+            --text:     #111827;
+            --muted:    #6b7280;
+            --danger:   #e02424;
+        }
 
+        body { background: var(--bg); }
+
+        /* ── Navbar — fixed: was completely missing ──────── */
+        .top-nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            height: 62px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 12px;
+        }
+        .brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            background: var(--primary);
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: .9rem;
+        }
+        .nav-links {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+            align-items: center;
+        }
+        .nav-links a {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: .855rem;
+            font-weight: 500;
+            color: var(--muted);
+            text-decoration: none;
+            transition: .15s;
+        }
+        .nav-links a:hover { background: var(--bg); color: var(--text); }
+        .nav-links a.active {
+            background: #eff4ff;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .cart-pill {
+            position: relative;
+        }
+        .cart-pill .badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: var(--danger);
+            color: #fff;
+            font-size: .65rem;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        .nav-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 700;
+            font-size: .85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* ── Products ───────────────────────────────────── */
         .product-card {
             transition: transform 0.25s, box-shadow 0.25s;
             border: none;
@@ -96,19 +205,15 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             background: #dc3545;
             color: #fff;
             font-weight: 700;
-            padding: 0.35em 0.85em;
+            padding: .35em .85em;
             border-radius: 50px;
-            font-size: 0.78rem;
+            font-size: .78rem;
         }
-
-        /* Quantity stepper */
         .qty-wrap { display: flex; align-items: center; gap: 0; }
         .qty-btn {
             width: 32px; height: 32px;
-            padding: 0;
-            line-height: 1;
-            font-size: 1.1rem;
-            flex-shrink: 0;
+            padding: 0; line-height: 1;
+            font-size: 1.1rem; flex-shrink: 0;
         }
         .qty-input {
             width: 52px !important;
@@ -120,49 +225,72 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         .qty-input::-webkit-inner-spin-button,
         .qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-
-        .line-total {
-            font-weight: 700;
-            color: #0d6efd;
-            font-size: 0.95rem;
-        }
-
-        .cart-badge {
-            font-size: .65rem;
-            position: relative;
-            top: -8px;
-            left: -4px;
-        }
+        .line-total { font-weight: 700; color: #0d6efd; font-size: .95rem; }
     </style>
 </head>
 <body>
 
-<!-- Top Nav Bar -->
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
-    <div class="container">
-        <a class="navbar-brand fw-bold text-primary" href="dashboard.php">
-           <i class="bi bi-shop-window"></i> JDB Parts
+<!-- fixed: $initials, $fullName, $user now defined above -->
+<nav class="top-nav">
+    <a href="dashboard.php" class="brand">
+        <span class="brand-icon"><i class="bi bi-shop-window"></i></span>
+        JDB Parts
+    </a>
+    <div class="nav-links">
+        <a href="dashboard.php"><i class="fas fa-home"></i> <span>Home</span></a>
+        <!-- fixed: active is now on products.php, not dashboard.php -->
+        <a href="products.php" class="active"><i class="fas fa-store"></i> <span>Shop</span></a>
+        <a href="orders.php"><i class="fas fa-box"></i> <span>Orders</span></a>
+        <a href="cart.php" class="cart-pill">
+            <i class="fas fa-shopping-cart"></i> <span>Cart</span>
+            <?php if ($cartCount > 0): ?>
+                <span class="badge"><?= $cartCount ?></span>
+            <?php endif; ?>
         </a>
-        <div class="d-flex align-items-center gap-3">
-            <a href="cart.php" class="btn btn-outline-primary position-relative">
-                <i class="fas fa-shopping-cart"></i>
-                <?php if ($cartCount > 0): ?>
-                    <span class="badge bg-danger cart-badge"><?= $cartCount ?></span>
-                <?php endif; ?>
-                Cart
-            </a>
-            <a href="dashboard.php" class="btn btn-outline-secondary">
-                <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-            </a>
+        <div class="dropdown ms-1">
+            <div class="nav-avatar dropdown-toggle"
+                 data-bs-toggle="dropdown" aria-expanded="false">
+                <?= htmlspecialchars($initials) ?>
+            </div>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <li class="px-3 py-1">
+                    <p class="fw-bold mb-0" style="font-size:.85rem">
+                        <?= htmlspecialchars($fullName) ?>
+                    </p>
+                    <p class="mb-0" style="font-size:.75rem;color:var(--muted)">
+                        <?= htmlspecialchars($user['email'] ?? '') ?>
+                    </p>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="account.php">
+                        <i class="fas fa-user-cog me-2 text-muted"></i>Account Settings
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="orders.php">
+                        <i class="fas fa-shopping-bag me-2 text-muted"></i>My Orders
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="../auth/logout.php"
+                       style="color:var(--danger)">
+                        <i class="fas fa-sign-out-alt me-2"></i>Logout
+                    </a>
+                </li>
+            </ul>
         </div>
     </div>
 </nav>
 
-<div class="container pb-5">
+<div class="container py-5">
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 fw-bold">Our Products</h1>
-        <span class="text-muted small"><?= number_format($totalProducts) ?> item<?= $totalProducts !== 1 ? 's' : '' ?> found</span>
+        <span class="text-muted small">
+            <?= number_format($totalProducts) ?> item<?= $totalProducts !== 1 ? 's' : '' ?> found
+        </span>
     </div>
 
     <!-- Search -->
@@ -211,7 +339,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                              alt="<?= htmlspecialchars($product['name']) ?>"
                              loading="lazy"
                              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                        <div class="card-img-top product-img d-none align-items-center justify-content-center bg-light" style="display:none!important">
+                        <div class="card-img-top product-img d-none align-items-center justify-content-center bg-light"
+                             style="display:none!important">
                             <i class="fas fa-box-open fa-3x text-muted"></i>
                         </div>
                         <?php else: ?>
@@ -219,6 +348,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <i class="fas fa-box-open fa-3x text-muted"></i>
                         </div>
                         <?php endif; ?>
+
                         <?php if ($hasSale): ?>
                             <span class="position-absolute top-0 start-0 m-2 sale-badge">SALE</span>
                         <?php endif; ?>
@@ -237,7 +367,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <?= htmlspecialchars($product['name']) ?>
                         </h6>
 
-                        <!-- Price -->
                         <div class="mb-3">
                             <?php if ($hasSale): ?>
                                 <span class="text-muted text-decoration-line-through me-1 small">
@@ -249,26 +378,23 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </span>
                         </div>
 
-                        <!-- Quantity Selector -->
                         <div class="mb-2">
                             <label class="form-label small fw-semibold mb-1">Quantity</label>
                             <div class="d-flex align-items-center gap-2">
                                 <div class="qty-wrap">
                                     <button type="button"
                                             class="btn btn-outline-secondary qty-btn btn-dec"
-                                            aria-label="Decrease quantity">−</button>
-                                    <input type="number"
-                                           class="form-control qty-input"
+                                            aria-label="Decrease">−</button>
+                                    <input type="number" class="form-control qty-input"
                                            value="1" min="1" max="<?= $maxStock ?>">
                                     <button type="button"
                                             class="btn btn-outline-secondary qty-btn btn-inc"
-                                            aria-label="Increase quantity">+</button>
+                                            aria-label="Increase">+</button>
                                 </div>
                                 <small class="text-muted">/ <?= $maxStock ?> in stock</small>
                             </div>
                         </div>
 
-                        <!-- Live Line Total -->
                         <div class="mb-3 p-2 bg-light rounded d-flex justify-content-between align-items-center">
                             <small class="text-muted">Total:</small>
                             <span class="line-total">
@@ -276,10 +402,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </span>
                         </div>
 
-                        <!-- Action Buttons -->
                         <div class="mt-auto d-flex gap-2">
                             <form action="add-to-cart.php" method="post" class="flex-grow-1 add-cart-form">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                <input type="hidden" name="csrf_token"
+                                       value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                                 <input type="hidden" name="product_id" value="<?= (int)$product['id'] ?>">
                                 <input type="hidden" name="quantity" value="1" class="hidden-qty">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -287,7 +413,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </button>
                             </form>
                             <form action="buy-now.php" method="post" class="buy-now-form">
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                <input type="hidden" name="csrf_token"
+                                       value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                                 <input type="hidden" name="product_id" value="<?= (int)$product['id'] ?>">
                                 <input type="hidden" name="quantity" value="1" class="hidden-qty">
                                 <button type="submit" class="btn btn-outline-primary" title="Buy Now">
@@ -301,66 +428,58 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php endforeach; ?>
         </div>
 
-        <!-- Pagination -->
         <?php if ($totalPages > 1): ?>
-            <nav class="mt-5">
-                <ul class="pagination justify-content-center">
-                    <?php if ($page > 1): ?>
-                        <li class="page-item">
-                            <a class="page-link" href="?page=<?= $page-1 ?><?= $search ? '&search='.urlencode($search) : '' ?>">
-                                &laquo;
-                            </a>
-                        </li>
-                    <?php endif; ?>
-                    <?php for ($i = max(1, $page-2); $i <= min($totalPages, $page+2); $i++): ?>
-                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                            <a class="page-link"
-                               href="?page=<?= $i ?><?= $search ? '&search='.urlencode($search) : '' ?>">
-                                <?= $i ?>
-                            </a>
-                        </li>
-                    <?php endfor; ?>
-                    <?php if ($page < $totalPages): ?>
-                        <li class="page-item">
-                            <a class="page-link" href="?page=<?= $page+1 ?><?= $search ? '&search='.urlencode($search) : '' ?>">
-                                &raquo;
-                            </a>
-                        </li>
-                    <?php endif; ?>
-                </ul>
-            </nav>
+        <nav class="mt-5">
+            <ul class="pagination justify-content-center">
+                <?php if ($page > 1): ?>
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page=<?= $page-1 ?><?= $search ? '&search='.urlencode($search) : '' ?>">
+                            &laquo;
+                        </a>
+                    </li>
+                <?php endif; ?>
+                <?php for ($i = max(1, $page-2); $i <= min($totalPages, $page+2); $i++): ?>
+                    <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                        <a class="page-link"
+                           href="?page=<?= $i ?><?= $search ? '&search='.urlencode($search) : '' ?>">
+                            <?= $i ?>
+                        </a>
+                    </li>
+                <?php endfor; ?>
+                <?php if ($page < $totalPages): ?>
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page=<?= $page+1 ?><?= $search ? '&search='.urlencode($search) : '' ?>">
+                            &raquo;
+                        </a>
+                    </li>
+                <?php endif; ?>
+            </ul>
+        </nav>
         <?php endif; ?>
 
     <?php endif; ?>
-</div><!-- /container -->
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/**
- * Quantity stepper + live total for each product card.
- */
 document.querySelectorAll('.product-card').forEach(card => {
-    const unitPrice   = parseFloat(card.dataset.unitPrice) || 0;
-    const maxStock    = parseInt(card.dataset.maxStock, 10) || 1;
+    const unitPrice = parseFloat(card.dataset.unitPrice) || 0;
+    const maxStock  = parseInt(card.dataset.maxStock, 10) || 1;
+    const qtyInput  = card.querySelector('.qty-input');
+    const totalSpan = card.querySelector('.total-amount');
+    const btnDec    = card.querySelector('.btn-dec');
+    const btnInc    = card.querySelector('.btn-inc');
+    const hiddenQtys = card.querySelectorAll('.hidden-qty');
 
-    const qtyInput    = card.querySelector('.qty-input');
-    const totalSpan   = card.querySelector('.total-amount');
-    const btnDec      = card.querySelector('.btn-dec');
-    const btnInc      = card.querySelector('.btn-inc');
-
-    // Hidden qty fields on both forms
-    const hiddenQtys  = card.querySelectorAll('.hidden-qty');
-
-    function clamp(val) {
-        return Math.min(maxStock, Math.max(1, val));
-    }
+    function clamp(val) { return Math.min(maxStock, Math.max(1, val)); }
 
     function refresh(qty) {
         qty = clamp(qty);
-        qtyInput.value   = qty;
+        qtyInput.value = qty;
         totalSpan.textContent = (unitPrice * qty).toLocaleString('en-PH', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+            minimumFractionDigits: 2, maximumFractionDigits: 2
         });
         hiddenQtys.forEach(h => h.value = qty);
         btnDec.disabled = qty <= 1;
@@ -369,16 +488,13 @@ document.querySelectorAll('.product-card').forEach(card => {
 
     btnDec.addEventListener('click', () => refresh(parseInt(qtyInput.value, 10) - 1));
     btnInc.addEventListener('click', () => refresh(parseInt(qtyInput.value, 10) + 1));
-
     qtyInput.addEventListener('change', () => refresh(parseInt(qtyInput.value, 10) || 1));
     qtyInput.addEventListener('input',  () => refresh(parseInt(qtyInput.value, 10) || 1));
 
-    // Init state
     refresh(1);
 });
 </script>
 
-<!-- Flash toast -->
 <?php if (isset($_SESSION['flash'])):
     $f = $_SESSION['flash']; unset($_SESSION['flash']);
 ?>
@@ -393,7 +509,9 @@ document.querySelectorAll('.product-card').forEach(card => {
         </div>
     </div>
 </div>
-<script>new bootstrap.Toast(document.querySelector('.toast'), {delay:3500}).show();</script>
+<script>
+    new bootstrap.Toast(document.querySelector('.toast'), { delay: 3500 }).show();
+</script>
 <?php endif; ?>
 
 </body>

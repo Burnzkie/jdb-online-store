@@ -128,24 +128,50 @@ $est_to   = date('M j, Y', strtotime($order['created_at'].' +7 days'));
         <p style="margin-top:10px;font-size:.78rem;color:var(--muted)">Placed on <?= date('F j, Y \a\t g:i A', strtotime($order['created_at'])) ?></p>
     </div>
 
-    <!-- Order Tracker -->
-    <div class="tracker">
-        <?php
-        $steps = [
-            ['icon'=>'fa-check-circle', 'label'=>'Order Placed', 'state'=>'done'],
-            ['icon'=>'fa-cog',          'label'=>'Processing',   'state'=>($order['status']==='pending'?'active':'done')],
-            ['icon'=>'fa-truck',        'label'=>'Shipped',      'state'=>in_array($order['status'],['pending','processing'])?'idle':'done'],
-            ['icon'=>'fa-home',         'label'=>'Delivered',    'state'=>$order['status']==='completed'?'done':'idle'],
-        ];
-        foreach ($steps as $step): ?>
-        <div class="track-step <?= $step['state'] ?>">
-            <div class="track-dot <?= $step['state'] ?>">
-                <i class="fas <?= $step['state']==='done'?'fa-check':$step['icon'] ?>"></i>
-            </div>
-            <span class="track-label"><?= $step['label'] ?></span>
-        </div>
-        <?php endforeach; ?>
-    </div>
+                    <!-- Order Tracker -->
+                <div class="tracker">
+                    <?php
+                    $status = $order['status'];
+                    $steps = [
+                        [
+                            'icon'  => 'fa-check-circle',
+                            'label' => 'Order Placed',
+                            'state' => 'done',
+                        ],
+                        [
+                            'icon'  => 'fa-cog',
+                            'label' => 'Processing',
+                            'state' => match($status) {
+                                'pending', 'processing' => 'active',
+                                default                 => 'done',
+                            },
+                        ],
+                        [
+                            'icon'  => 'fa-truck',
+                            'label' => 'Shipped',
+                            'state' => match($status) {
+                                'pending', 'processing' => 'idle',
+                                'shipped'               => 'active',
+                                default                 => 'done',
+                            },
+                        ],
+                        [
+                            'icon'  => 'fa-home',
+                            'label' => 'Delivered',
+                            'state' => in_array($status, ['delivered', 'completed']) ? 'done' : 'idle',
+                        ],
+                    ];
+
+                    // ← THIS FOREACH WAS MISSING — add it
+                    foreach ($steps as $step): ?>
+                    <div class="track-step <?= $step['state'] ?>">
+                        <div class="track-dot <?= $step['state'] ?>">
+                            <i class="fas <?= $step['state'] === 'done' ? 'fa-check' : $step['icon'] ?>"></i>
+                        </div>
+                        <span class="track-label"><?= $step['label'] ?></span>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
 
     <!-- Delivery Info -->
     <div style="background:var(--primary-soft);border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;">

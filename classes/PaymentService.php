@@ -9,8 +9,16 @@ class PaymentService
 
     public function __construct()
     {
-        $this->secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? '';
-        $this->publicKey = $_ENV['PAYMONGO_PUBLIC_KEY'] ?? '';
+        $this->secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?: '';
+        $this->publicKey = $_ENV['PAYMONGO_PUBLIC_KEY'] ?? getenv('PAYMONGO_PUBLIC_KEY') ?: '';
+    }
+
+    /**
+     * Returns true if API keys are configured.
+     */
+    public function isConfigured(): bool
+    {
+        return !empty($this->secretKey) && !empty($this->publicKey);
     }
 
     /**
@@ -22,16 +30,17 @@ class PaymentService
         string $orderId,
         string $orderNumber,
         string $customerEmail,
-        string $customerName
+        string $customerName,
+        array  $items = []
     ): array {
         $payload = [
             'data' => [
                 'attributes' => [
-                    'amount'      => (int)round($amount * 100), // PayMongo uses centavos
                     'currency'    => 'PHP',
                     'description' => "JDB Parts Order $orderNumber",
                     'statement_descriptor' => 'JDB PARTS',
                     'payment_method_types' => ['gcash'],
+                    'line_items'  => $this->buildLineItems($items, $amount),
                     'success_url' => $this->getBaseUrl() . "/customer/payment-success.php?order_id=$orderId",
                     'cancel_url'  => $this->getBaseUrl() . "/customer/payment-cancel.php?order_id=$orderId",
                     'metadata'    => [
@@ -57,7 +66,9 @@ class PaymentService
             ];
         }
 
-        return ['success' => false, 'message' => 'Failed to create payment session.'];
+        $detail = $response['errors'][0]['detail'] ?? $response['errors'][0]['code'] ?? 'Failed to create GCash payment session.';
+        error_log("PaymentService GCash failed: $detail | Response: " . json_encode($response));
+        return ['success' => false, 'message' => $detail];
     }
 
     /**
@@ -68,16 +79,16 @@ class PaymentService
         string $orderId,
         string $orderNumber,
         string $customerEmail,
-        string $customerName
+        string $customerName,
+        array  $items = []
     ): array {
-        // Same as GCash but different payment_method_types
         $payload = [
             'data' => [
                 'attributes' => [
-                    'amount'      => (int)round($amount * 100),
                     'currency'    => 'PHP',
                     'description' => "JDB Parts Order $orderNumber",
                     'payment_method_types' => ['paymaya'],
+                    'line_items'  => $this->buildLineItems($items, $amount),
                     'success_url' => $this->getBaseUrl() . "/customer/payment-success.php?order_id=$orderId",
                     'cancel_url'  => $this->getBaseUrl() . "/customer/payment-cancel.php?order_id=$orderId",
                     'metadata'    => ['order_id' => $orderId, 'order_number' => $orderNumber],
@@ -96,7 +107,33 @@ class PaymentService
             ];
         }
 
-        return ['success' => false, 'message' => 'Failed to create Maya payment session.'];
+        $detail = $response['errors'][0]['detail'] ?? $response['errors'][0]['code'] ?? 'Failed to create Maya payment session.';
+        error_log("PaymentService Maya failed: $detail | Response: " . json_encode($response));
+        return ['success' => false, 'message' => $detail];
+    }
+
+    /**
+     * Build PayMongo line_items array from cart items.
+     * Falls back to a single "Order Total" line item if no items provided.
+     */
+    private function buildLineItems(array $items, float $fallbackAmount): array
+    {
+        if (!empty($items)) {
+            return array_map(fn($item) => [
+                'name'     => $item['name'],
+                'amount'   => (int)round((float)$item['price'] * 100),
+                'currency' => 'PHP',
+                'quantity' => (int)$item['quantity'],
+            ], $items);
+        }
+
+        // Fallback: single line item with the grand total
+        return [[
+            'name'     => 'Order Total',
+            'amount'   => (int)round($fallbackAmount * 100),
+            'currency' => 'PHP',
+            'quantity' => 1,
+        ]];
     }
 
     /**
@@ -105,9 +142,38 @@ class PaymentService
      */
     public function verifyWebhook(string $payload, string $signature): bool
     {
-        $webhookSecret = $_ENV['PAYMONGO_WEBHOOK_SECRET'] ?? '';
-        $computed = hash_hmac('sha256', $payload, $webhookSecret);
-        return hash_equals($computed, $signature);
+        $webhookSecret = $_ENV['PAYMONGO_WEBHOOK_SECRET']
+            ?? getenv('PAYMONGO_WEBHOOK_SECRET')
+            ?: '';
+
+        if (empty($webhookSecret) || empty($signature)) {
+            error_log('PaymentService::verifyWebhook — missing secret or signature.');
+            return false;
+        }
+
+        // PayMongo signature header format:
+        // t=<timestamp>,te=<test_sig>,li=<live_sig>
+        // We must verify against the correct one (te = test mode, li = live mode).
+        $parts = [];
+        foreach (explode(',', $signature) as $part) {
+            [$k, $v]    = explode('=', $part, 2) + ['', ''];
+            $parts[$k]  = $v;
+        }
+
+        $timestamp = $parts['t'] ?? '';
+        // Use live signature in production, test signature in test mode
+        $sigToVerify = $parts['li'] ?? $parts['te'] ?? '';
+
+        if (empty($timestamp) || empty($sigToVerify)) {
+            error_log('PaymentService::verifyWebhook — could not parse signature header.');
+            return false;
+        }
+
+        // PayMongo signs: "<timestamp>.<raw_payload>"
+        $signedPayload = $timestamp . '.' . $payload;
+        $computed      = hash_hmac('sha256', $signedPayload, $webhookSecret);
+
+        return hash_equals($computed, $sigToVerify);
     }
 
     /**
@@ -153,6 +219,6 @@ class PaymentService
     private function getBaseUrl(): string
     {
         $scheme = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
-        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'sql208.infinityfree.com');
     }
 }

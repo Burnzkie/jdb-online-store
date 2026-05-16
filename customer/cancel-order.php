@@ -81,11 +81,8 @@ try {
     }
 
     // Determine refund eligibility
-    // COD orders that are still pending have NOT been paid yet → no refund needed
-    // GCash / bank orders in any cancellable state may have been paid → flag for refund
-    $isPaid            = strtolower($order['payment_status']) === 'paid';
-    $isNonCodPayment   = in_array(strtolower($order['payment_method']), ['gcash', 'bank'], true);
-    $refundNeeded      = $isPaid || $isNonCodPayment;
+         $isPaid       = strtolower($order['payment_status']) === 'paid';
+        $refundNeeded = $isPaid; 
 
     $newPaymentStatus  = $refundNeeded ? 'refund_pending' : 'cancelled';
     $cancellationNotes = "Cancelled by customer. Reason: $reason";

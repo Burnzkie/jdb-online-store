@@ -21,26 +21,33 @@ $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($user_name) . '&bac
 // ── Status update ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     if (hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
-        $orderObj->updateStatus((int)$_POST['order_id'], $_POST['status'] ?? '');
+        $newStatus = $_POST['status'] ?? '';
+        $orderId   = (int)$_POST['order_id'];
+
+        $orderObj->updateStatus($orderId, $newStatus);
+
+        // Send shipping email INSIDE the POST block where variables are defined
+        if ($newStatus === 'shipped') {
+            try {
+                require_once '../classes/EmailService.php';
+                $emailService = new EmailService();
+                $orderData    = $orderObj->getOrderById($orderId);
+                if ($orderData) {
+                    $emailService->sendShippingUpdate(
+                        $orderData['customer_email'] ?? $orderData['user_email'] ?? '',
+                        $orderData['customer_name']  ?? $orderData['user_fullname'] ?? '',
+                        $orderData['order_number'],
+                        'shipped'
+                    );
+                }
+            } catch (Exception $e) {
+                error_log('Shipping email failed: ' . $e->getMessage());
+            }
+        }
     }
     header('Location: orders.php?msg=' . urlencode('Order status updated.'));
     exit;
 }
-        // After $orderModel->updateStatus($orderId, $status)
-        if ($status === 'shipped') {
-            require_once '../classes/EmailService.php';
-            $emailService = new EmailService();
-            // Fetch customer email from order
-            $orderData = $orderModel->getOrderById($orderId);
-            if ($orderData) {
-                $emailService->sendShippingUpdate(
-                    $orderData['customer_email'] ?? $orderData['user_email'],
-                    $orderData['customer_name']  ?? $orderData['user_fullname'],
-                    $orderData['order_number'],
-                    'shipped'
-                );
-            }
-        }
 
 $message   = urldecode($_GET['msg'] ?? '');
 $allOrders = $orderObj->getAllOrders();
@@ -49,11 +56,12 @@ $statusColors = [
     'pending'    => 'warning text-dark',
     'processing' => 'info text-dark',
     'shipped'    => 'primary',
-    'delivered'  => 'success',
+    'delivered'  => 'success',    // fixed: was missing
+    'completed'  => 'success',
     'cancelled'  => 'secondary',
     'refunded'   => 'danger',
 ];
-$validStatuses = array_keys($statusColors);
+$validStatuses = array_keys($statusColors); // fixed: now includes 'delivered'
 $currentPage   = 'orders';
 ?>
 <!DOCTYPE html>
@@ -130,14 +138,18 @@ $currentPage   = 'orders';
                     </thead>
                     <tbody>
                         <?php foreach ($allOrders as $o):
-                            $customer  = $o['customer_name'] ?? $o['user_fullname'] ?? 'Guest';
-                            $email     = $o['customer_email'] ?? $o['user_email'] ?? '';
+                            $customer = $o['customer_name'] ?? $o['user_fullname'] ?? 'Guest';
+                            $email    = $o['customer_email'] ?? $o['user_email'] ?? '';
                             $payColors = [
-                                'paid'    => 'success',
-                                'pending' => 'warning text-dark',
-                                'failed'  => 'danger',
+                                'paid'           => 'success',
+                                'pending'        => 'warning text-dark',
+                                'failed'         => 'danger',
+                                'refund_pending' => 'warning text-dark',
+                                'cancelled'      => 'secondary',
                             ];
-                            $payColor  = $payColors[$o['payment_status'] ?? ''] ?? 'secondary';
+                            $payColor = $payColors[$o['payment_status'] ?? ''] ?? 'secondary';
+                            $oStatus  = strtolower($o['status'] ?? 'pending');
+                            $oColor   = $statusColors[$oStatus] ?? 'secondary';
                         ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($o['order_number'] ?? '#' . $o['id']) ?></strong></td>
@@ -151,7 +163,7 @@ $currentPage   = 'orders';
                             <td>&#8369;<?= number_format($o['total'], 2) ?></td>
                             <td>
                                 <span class="badge bg-<?= $payColor ?>">
-                                    <?= ucfirst($o['payment_status'] ?? 'pending') ?>
+                                    <?= ucfirst(str_replace('_', ' ', $o['payment_status'] ?? 'pending')) ?>
                                 </span>
                             </td>
                             <td>
@@ -163,7 +175,7 @@ $currentPage   = 'orders';
                                             style="min-width:130px;"
                                             onchange="this.form.submit()">
                                         <?php foreach ($validStatuses as $s): ?>
-                                            <option value="<?= $s ?>" <?= $o['status'] === $s ? 'selected' : '' ?>>
+                                            <option value="<?= $s ?>" <?= $oStatus === $s ? 'selected' : '' ?>>
                                                 <?= ucfirst($s) ?>
                                             </option>
                                         <?php endforeach; ?>

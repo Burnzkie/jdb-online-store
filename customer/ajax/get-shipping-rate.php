@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../../classes/ShippingService.php';
+require_once '../classes/ShippingService.php'; // fixed: was ../../classes/
 
 header('Content-Type: application/json');
 

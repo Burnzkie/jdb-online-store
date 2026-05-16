@@ -82,7 +82,10 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .pill-cancelled{background:var(--danger-soft);color:var(--danger);}
         .pill-processing{background:var(--primary-soft);color:var(--primary);}
         .pill-default{background:#f3f4f6;color:var(--muted);}
+        .pill-shipped   { background: #eff6ff; color: #1d4ed8; }
+        .pill-delivered { background: var(--success-soft); color: var(--success); }
 
+        
         .btn-view{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:600;color:var(--primary);border:1.5px solid var(--primary);text-decoration:none;background:var(--primary-soft);transition:.15s;white-space:nowrap;}
         .btn-view:hover{background:var(--primary);color:#fff;}
 
@@ -140,11 +143,14 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         <?php foreach ($orders as $order):
             $status = strtolower($order['status']);
+            
             $pillClass = match($status) {
                 'completed'  => 'pill-completed',
+                'delivered'  => 'pill-completed',   
                 'pending'    => 'pill-pending',
                 'cancelled'  => 'pill-cancelled',
                 'processing' => 'pill-processing',
+                'shipped'    => 'pill-shipped',    
                 default      => 'pill-default'
             };
             $dot = '●';
