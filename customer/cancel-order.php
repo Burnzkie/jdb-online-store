@@ -3,6 +3,9 @@
  * customer/cancel-order.php
  * Cancels a pending/processing order and restores stock.
  * Only the order owner can cancel, and only within the allowed window.
+ *
+ * Fix: now correctly inserts into refund_requests when a paid order is cancelled,
+ * instead of just claiming "a refund request was submitted" without doing it.
  */
 
 declare(strict_types=1);
@@ -80,25 +83,24 @@ try {
         exit;
     }
 
-    // Determine refund eligibility
-         $isPaid       = strtolower($order['payment_status']) === 'paid';
-        $refundNeeded = $isPaid; 
+    // Determine refund eligibility — only if customer already paid
+    $isPaid       = strtolower($order['payment_status']) === 'paid';
+    $refundNeeded = $isPaid;
 
     $newPaymentStatus  = $refundNeeded ? 'refund_pending' : 'cancelled';
     $cancellationNotes = "Cancelled by customer. Reason: $reason";
 
-    // Update order status
-    $update = $pdo->prepare("
+    // 1 ── Update order status
+    $pdo->prepare("
         UPDATE orders
-        SET status          = 'cancelled',
-            payment_status  = ?,
-            notes           = CONCAT(COALESCE(notes, ''), '\n\n', ?),
-            updated_at      = NOW()
+        SET status         = 'cancelled',
+            payment_status = ?,
+            notes          = CONCAT(COALESCE(notes, ''), '\n\n', ?),
+            updated_at     = NOW()
         WHERE id = ?
-    ");
-    $update->execute([$newPaymentStatus, $cancellationNotes, $orderId]);
+    ")->execute([$newPaymentStatus, $cancellationNotes, $orderId]);
 
-    // Restore stock for each item
+    // 2 ── Restore stock for each item
     $itemsStmt = $pdo->prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?");
     $itemsStmt->execute([$orderId]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -113,12 +115,32 @@ try {
         $restoreStmt->execute([$item['quantity'], $item['product_id']]);
     }
 
+    // 3 ── If already paid, create a refund request for admin review.
+    //      COD orders skip this entirely since no payment was made.
+    //      The refunds table is only written to by admin when a refund is approved.
+    if ($refundNeeded) {
+        $refundTotal = (float)$order['total_amount'] + (float)($order['shipping_amount'] ?? 0);
+
+        $pdo->prepare("
+            INSERT INTO refund_requests
+                (order_id, user_id, amount, reason, status, created_at)
+            VALUES
+                (?, ?, ?, ?, 'pending', NOW())
+        ")->execute([
+            $orderId,
+            $userId,
+            round($refundTotal, 2),
+            "Order cancelled by customer. Reason: $reason",
+        ]);
+    }
+
     $pdo->commit();
 
+    // ── Flash message ─────────────────────────────────────────────────────────
     if ($refundNeeded) {
         $_SESSION['flash'] = [
             'type'    => 'info',
-            'message' => "Order <strong>{$order['order_number']}</strong> cancelled. A refund request has been submitted and will be reviewed by our team.",
+            'message' => "Order <strong>{$order['order_number']}</strong> cancelled. A refund request has been submitted and will be reviewed by our team within 3–5 business days.",
         ];
     } else {
         $_SESSION['flash'] = [

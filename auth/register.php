@@ -11,7 +11,7 @@ if (empty($_SESSION['csrf_token'])) {
 
 $pdo   = Database::getInstance()->getConnection();
 $user  = new User($pdo);
-$error = ''; // ✅ Fix: initialize $error so it's never undefined
+$error = '';
 
 // Preserve form values on error
 $firstname = '';
@@ -19,20 +19,32 @@ $lastname  = '';
 $phone     = '';
 $email     = '';
 
+// Address fields (preserved on error)
+$addrStreet   = '';
+$addrBarangay = '';
+$addrCity     = '';
+$addrProvince = '';
+$addrPostal   = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF check
     if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
         $error = 'Invalid request. Please try again.';
     } else {
         $role = $_POST['role'] ?? 'customer';
 
-        // Common fields
         $firstname = trim($_POST['firstname'] ?? '');
-        $lastname  = trim($_POST['lastname'] ?? '');
-        $phone     = trim($_POST['phone'] ?? '');
-        $email     = trim($_POST['email'] ?? '');
-        $password  = $_POST['password'] ?? '';
+        $lastname  = trim($_POST['lastname']  ?? '');
+        $phone     = trim($_POST['phone']     ?? '');
+        $email     = trim($_POST['email']     ?? '');
+        $password  = $_POST['password']         ?? '';
         $confirm   = $_POST['password_confirm'] ?? '';
+
+        // Address (optional — customer only)
+        $addrStreet   = trim($_POST['address_street']   ?? '');
+        $addrBarangay = trim($_POST['address_barangay'] ?? '');
+        $addrCity     = trim($_POST['address_city']     ?? '');
+        $addrProvince = trim($_POST['address_province'] ?? '');
+        $addrPostal   = trim($_POST['address_postal']   ?? '');
 
         if (empty($firstname) || empty($lastname) || empty($phone) || empty($email) || empty($password)) {
             $error = 'All required fields must be filled.';
@@ -40,7 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Passwords do not match.';
         } else {
             if ($role === 'customer') {
-                $result = $user->register($firstname, $lastname, $phone, $email, $password);
+                $result = $user->register(
+                    $firstname, $lastname, $phone, $email, $password,
+                    'customer', null, null,
+                    $addrStreet   ?: null,
+                    $addrBarangay ?: null,
+                    $addrCity     ?: null,
+                    $addrProvince ?: null,
+                    $addrPostal   ?: null
+                );
 
                 if ($result['success']) {
                     $loginResult = $user->login($email, $password);
@@ -53,9 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = $result['message'];
                 }
             } elseif ($role === 'staff') {
-                $staff_id      = trim($_POST['staff_id'] ?? '');
-                $position      = trim($_POST['position'] ?? '');
-                $approval_code = $_POST['approval_code'] ?? '';
+                $staff_id      = trim($_POST['staff_id']      ?? '');
+                $position      = trim($_POST['position']      ?? '');
+                $approval_code = $_POST['approval_code']      ?? '';
 
                 if (empty($staff_id) || empty($position) || empty($approval_code)) {
                     $error = 'All staff fields are required.';
@@ -124,7 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 2rem 1rem;
         }
 
-        /* Ambient background blobs */
         body::before {
             content: '';
             position: fixed;
@@ -142,7 +161,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pointer-events: none;
         }
 
-        /* ── Layout ───────────────────────────────── */
         .wrapper {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -161,7 +179,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             to   { opacity:1; transform:translateY(0); }
         }
 
-        /* ── Left panel ───────────────────────────── */
         .panel-left {
             background: linear-gradient(160deg, #1a1400 0%, #0d0d0d 100%);
             padding: 3rem 2.5rem;
@@ -181,212 +198,176 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: radial-gradient(circle, rgba(240,192,64,.15) 0%, transparent 70%);
         }
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            position: relative;
-        }
+        .brand { display: flex; align-items: center; gap: .75rem; position: relative; }
         .brand-icon {
             width: 42px; height: 42px;
             background: var(--accent);
             border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 1.3rem;
-            color: #000;
+            font-size: 1.3rem; color: #000;
         }
         .brand-name {
             font-family: 'Syne', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 800;
-            letter-spacing: -.03em;
-            color: var(--text);
+            font-size: 1.5rem; font-weight: 800;
+            letter-spacing: -.03em; color: var(--text);
         }
         .brand-name span { color: var(--accent); }
 
-        .panel-pitch {
-            position: relative;
-        }
+        .panel-pitch { position: relative; }
         .panel-pitch h2 {
             font-family: 'Syne', sans-serif;
-            font-size: 2rem;
-            font-weight: 800;
-            line-height: 1.2;
-            margin-bottom: 1rem;
+            font-size: 2rem; font-weight: 800;
+            line-height: 1.2; margin-bottom: 1rem;
         }
-        .panel-pitch h2 em {
-            font-style: normal;
-            color: var(--accent);
-        }
-        .panel-pitch p {
-            color: var(--muted);
-            font-size: .95rem;
-            line-height: 1.6;
-            margin-bottom: 1.75rem;
-        }
+        .panel-pitch h2 em { font-style: normal; color: var(--accent); }
+        .panel-pitch p { color: var(--muted); font-size: .95rem; line-height: 1.6; margin-bottom: 1.75rem; }
 
         .perks { list-style: none; display: flex; flex-direction: column; gap: .75rem; }
-        .perks li {
-            display: flex; align-items: center; gap: .75rem;
-            font-size: .9rem; color: #aaa;
-        }
+        .perks li { display: flex; align-items: center; gap: .75rem; font-size: .9rem; color: #aaa; }
         .perks li i {
             width: 28px; height: 28px;
             background: rgba(240,192,64,.12);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-size: .8rem;
-            color: var(--accent);
-            flex-shrink: 0;
+            color: var(--accent); font-size: .85rem;
         }
 
-        /* ── Right panel ──────────────────────────── */
+        /* ── Right panel ─────────────── */
         .panel-right {
             padding: 3rem 2.5rem;
             overflow-y: auto;
-            max-height: 90vh;
+            max-height: 100vh;
         }
-
         .panel-right h3 {
             font-family: 'Syne', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 1.75rem; font-weight: 800;
             margin-bottom: .25rem;
         }
-        .panel-right .sub {
-            color: var(--muted);
-            font-size: .9rem;
-            margin-bottom: 1.75rem;
-        }
+        .sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.5rem; }
 
-        /* ── Role toggle ──────────────────────────── */
+        /* Role toggle */
         .role-toggle {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            display: flex; gap: .5rem;
             background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 4px;
-            margin-bottom: 1.75rem;
-            gap: 4px;
+            border-radius: 12px; padding: .35rem;
+            margin-bottom: 1.5rem;
         }
         .role-btn {
-            display: flex; align-items: center; justify-content: center; gap: .5rem;
-            padding: .6rem 1rem;
-            border-radius: 9px;
-            font-size: .875rem;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            transition: var(--transition);
-            font-family: inherit;
+            flex: 1; padding: .55rem 1rem;
+            border: none; border-radius: 9px;
+            background: none; color: var(--muted);
+            font-family: inherit; font-size: .9rem;
+            cursor: pointer; transition: var(--transition);
+            display: flex; align-items: center; justify-content: center; gap: .4rem;
         }
-        .role-btn.active {
-            background: var(--accent);
-            color: #000;
-            font-weight: 600;
-        }
-        .role-btn i { font-size: 1rem; }
+        .role-btn.active { background: var(--card); color: var(--text); box-shadow: 0 2px 6px rgba(0,0,0,.3); }
 
-        /* ── Alert ────────────────────────────────── */
+        /* Alert */
         .alert {
             display: flex; align-items: flex-start; gap: .75rem;
-            padding: .875rem 1rem;
-            border-radius: var(--radius);
-            margin-bottom: 1.25rem;
-            font-size: .88rem;
-            animation: fadeIn .3s ease;
+            padding: .85rem 1rem; border-radius: 10px;
+            margin-bottom: 1.25rem; font-size: .9rem;
         }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-        .alert-danger  { background: rgba(255,94,94,.1);  border: 1px solid rgba(255,94,94,.3);  color: #ff9090; }
-        .alert i { margin-top: 1px; flex-shrink: 0; }
+        .alert-danger { background: rgba(255,94,94,.1); color: var(--danger); border: 1px solid rgba(255,94,94,.2); }
 
-        /* ── Form ─────────────────────────────────── */
+        /* Fields */
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        .field { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .85rem; }
+        .field label { font-size: .875rem; font-weight: 500; color: #ccc; }
+        .req { color: var(--accent); }
 
-        .field { display: flex; flex-direction: column; margin-bottom: .85rem; }
-        .field label {
-            font-size: .8rem;
-            font-weight: 600;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-            color: var(--muted);
-            margin-bottom: .4rem;
-        }
-        .field label .req { color: var(--accent); margin-left: 2px; }
-
-        .field input {
+        .field input, .field select {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 10px;
             padding: .72rem 1rem;
             color: var(--text);
-            font-size: .95rem;
-            font-family: inherit;
-            transition: var(--transition);
-            outline: none;
+            font-size: .95rem; font-family: inherit;
+            transition: var(--transition); outline: none;
+            appearance: auto;
         }
-        .field input::placeholder { color: #555; }
-        .field input:focus {
+        .field input::placeholder, .field select::placeholder { color: #555; }
+        .field input:focus, .field select:focus {
             border-color: var(--accent);
             background: #1a1a1a;
             box-shadow: 0 0 0 3px rgba(240,192,64,.1);
         }
+        .field select option { background: var(--card); color: var(--text); }
+        .field select:disabled { opacity: .5; cursor: not-allowed; }
 
-        .field .input-wrap { position: relative; }
-        .field .input-wrap input { width: 100%; padding-right: 2.75rem; }
-        .field .input-wrap .toggle-pw {
+        .input-wrap { position: relative; }
+        .input-wrap input { width: 100%; padding-right: 2.75rem; }
+        .toggle-pw {
             position: absolute; right: .85rem; top: 50%; transform: translateY(-50%);
-            background: none; border: none; color: var(--muted); cursor: pointer; padding: 0;
-            font-size: 1rem; transition: color var(--transition);
+            background: none; border: none; color: var(--muted);
+            cursor: pointer; padding: 0; font-size: 1rem;
+            transition: color var(--transition);
         }
-        .field .input-wrap .toggle-pw:hover { color: var(--text); }
+        .toggle-pw:hover { color: var(--text); }
 
-        .field-hint { font-size: .78rem; color: var(--muted); margin-top: .35rem; }
+        /* Password strength */
+        .strength-bar {
+            height: 3px; background: var(--border);
+            border-radius: 2px; margin-top: .4rem; overflow: hidden;
+        }
+        .strength-bar-fill { height: 100%; width: 0; transition: width .3s, background .3s; }
+        .field-hint { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
 
-        /* ── Staff section ────────────────────────── */
+        /* Staff section */
         .staff-section {
             display: none;
-            border-top: 1px solid var(--border);
-            padding-top: 1.25rem;
-            margin-top: .5rem;
-            margin-bottom: .5rem;
+            background: rgba(240,192,64,.04);
+            border: 1px solid rgba(240,192,64,.15);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: .85rem;
         }
-        .staff-section.visible { display: block; animation: fadeIn .3s ease; }
+        .staff-section.visible { display: block; }
         .staff-label {
-            font-size: .75rem;
-            font-weight: 700;
-            letter-spacing: .08em;
-            text-transform: uppercase;
-            color: var(--accent2);
-            margin-bottom: 1rem;
+            font-size: .8rem; font-weight: 600;
+            color: var(--accent); text-transform: uppercase;
+            letter-spacing: .05em; margin-bottom: .75rem;
             display: flex; align-items: center; gap: .5rem;
         }
-        .staff-label::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border);
+
+        /* ── Address section ── */
+        .address-section {
+            background: rgba(240,192,64,.04);
+            border: 1px solid rgba(240,192,64,.12);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: .85rem;
+        }
+        .address-section.hidden { display: none; }
+        .address-label {
+            font-size: .8rem; font-weight: 600;
+            color: var(--accent); text-transform: uppercase;
+            letter-spacing: .05em; margin-bottom: .75rem;
+            display: flex; align-items: center; gap: .5rem;
+        }
+        .address-hint {
+            font-size: .8rem; color: var(--muted);
+            margin-bottom: .85rem; line-height: 1.4;
+        }
+        #reg-manual-wrap { display: none; }
+        #reg-manual-wrap .manual-warning {
+            font-size: .8rem; color: #f0a030;
+            background: rgba(240,160,48,.08);
+            border: 1px solid rgba(240,160,48,.2);
+            border-radius: 8px; padding: .6rem .85rem;
+            margin-bottom: .5rem;
         }
 
-        /* ── Submit btn ───────────────────────────── */
+        /* Submit */
         .btn-submit {
-            width: 100%;
-            padding: .9rem 1.5rem;
-            background: var(--accent);
-            color: #000;
+            width: 100%; padding: .9rem 1.5rem;
+            background: var(--accent); color: #000;
             font-family: 'Syne', sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            margin-top: 1rem;
+            font-size: 1rem; font-weight: 700;
+            border: none; border-radius: 12px;
+            cursor: pointer; margin-top: .5rem;
             transition: var(--transition);
             display: flex; align-items: center; justify-content: center; gap: .5rem;
-            letter-spacing: .01em;
         }
         .btn-submit:hover {
             background: #f5ce60;
@@ -396,34 +377,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-submit:active { transform: translateY(0); }
 
         .login-link {
-            text-align: center;
-            margin-top: 1.25rem;
-            font-size: .875rem;
-            color: var(--muted);
+            text-align: center; margin-top: 1.5rem;
+            font-size: .875rem; color: var(--muted);
         }
         .login-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
         .login-link a:hover { text-decoration: underline; }
 
-        /* ── Password strength ────────────────────── */
-        .strength-bar {
-            height: 3px;
-            border-radius: 3px;
-            background: var(--border);
-            margin-top: .5rem;
-            overflow: hidden;
-        }
-        .strength-bar-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width .3s ease, background .3s ease;
-            width: 0%;
-        }
-
-        /* ── Responsive ───────────────────────────── */
         @media (max-width: 700px) {
             .wrapper { grid-template-columns: 1fr; }
             .panel-left { display: none; }
             .panel-right { max-height: none; padding: 2rem 1.5rem; }
+            .form-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -442,8 +406,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h2>Your <em>one-stop</em> auto parts platform.</h2>
             <p>Join thousands of mechanics and car enthusiasts who source quality parts fast, at competitive prices.</p>
             <ul class="perks">
-                <li><i class="bi bi-lightning-charge-fill"></i> Fast order processing & tracking</li>
-                <li><i class="bi bi-shield-check-fill"></i> Verified OEM & aftermarket parts</li>
+                <li><i class="bi bi-lightning-charge-fill"></i> Fast order processing &amp; tracking</li>
+                <li><i class="bi bi-shield-check-fill"></i> Verified OEM &amp; aftermarket parts</li>
                 <li><i class="bi bi-truck"></i> Nationwide delivery network</li>
                 <li><i class="bi bi-headset"></i> Dedicated support team</li>
             </ul>
@@ -530,6 +494,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
 
+            <!-- ── Customer Address Section ──────────────────── -->
+            <div class="address-section" id="addressSection">
+                <div class="address-label">
+                    <i class="bi bi-geo-alt-fill"></i> Delivery Address
+                </div>
+
+                <!-- Street -->
+                <div class="field">
+                    <label>Street / House No.</label>
+                    <input type="text" name="address_street" id="reg-street"
+                           value="<?= htmlspecialchars($addrStreet) ?>"
+                           placeholder="e.g. 123 Rizal St., Purok 4">
+                </div>
+
+                <!-- Province -->
+                <div class="form-row">
+                    <div class="field">
+                        <label>Province</label>
+                        <select name="address_province" id="reg-province">
+                            <option value="">Loading provinces...</option>
+                        </select>
+                    </div>
+                    <!-- City -->
+                    <div class="field">
+                        <label>City / Municipality</label>
+                        <select name="address_city" id="reg-city" disabled>
+                            <option value="">Select province first</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Barangay + Postal -->
+                <div class="form-row">
+                    <div class="field">
+                        <label>Barangay</label>
+                        <select name="address_barangay" id="reg-barangay" disabled>
+                            <option value="">Select city first</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Postal Code</label>
+                        <input type="text" name="address_postal" id="reg-postal"
+                               value="<?= htmlspecialchars($addrPostal) ?>"
+                               placeholder="e.g. 7113" maxlength="10">
+                    </div>
+                </div>
+
+                <!-- Manual fallback -->
+                <div id="reg-manual-wrap">
+                    <div class="manual-warning">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Address lookup unavailable. You can type your full address below.
+                    </div>
+                    <div class="field">
+                        <input type="text" name="address_manual"
+                               placeholder="Barangay, City, Province, Postal Code">
+                    </div>
+                </div>
+
+                <!-- Hidden fields to carry selected text values on POST -->
+                <input type="hidden" name="address_city_val"     id="reg-city-hidden">
+                <input type="hidden" name="address_barangay_val" id="reg-barangay-hidden">
+            </div>
+
             <!-- Staff Fields -->
             <div class="staff-section <?= (($_POST['role'] ?? '') === 'staff') ? 'visible' : '' ?>" id="staffSection">
                 <div class="staff-label"><i class="bi bi-person-badge"></i> Staff Details</div>
@@ -537,12 +565,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-row">
                     <div class="field">
                         <label>Staff ID <span class="req">*</span></label>
-                        <input type="text" name="staff_id" value="<?= htmlspecialchars($_POST['staff_id'] ?? '') ?>"
+                        <input type="text" name="staff_id"
+                               value="<?= htmlspecialchars($_POST['staff_id'] ?? '') ?>"
                                placeholder="e.g. STF-001">
                     </div>
                     <div class="field">
                         <label>Position <span class="req">*</span></label>
-                        <input type="text" name="position" value="<?= htmlspecialchars($_POST['position'] ?? '') ?>"
+                        <input type="text" name="position"
+                               value="<?= htmlspecialchars($_POST['position'] ?? '') ?>"
                                placeholder="e.g. Warehouse Manager">
                     </div>
                 </div>
@@ -550,7 +580,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="field">
                     <label>Approval Code <span class="req">*</span></label>
                     <div class="input-wrap">
-                        <input type="password" name="approval_code" id="ac" placeholder="Provided by admin" autocomplete="off">
+                        <input type="password" name="approval_code" id="ac"
+                               placeholder="Provided by admin" autocomplete="off">
                         <button type="button" class="toggle-pw" data-target="ac" aria-label="Show code">
                             <i class="bi bi-eye"></i>
                         </button>
@@ -577,23 +608,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const btnStaff     = document.getElementById('btnStaff');
     const roleInput    = document.getElementById('roleInput');
     const staffSection = document.getElementById('staffSection');
+    const addrSection  = document.getElementById('addressSection');
     const submitLabel  = document.getElementById('submitLabel');
 
     function setRole(role) {
         roleInput.value = role;
         btnCustomer.classList.toggle('active', role === 'customer');
-        btnStaff.classList.toggle('active', role === 'staff');
+        btnStaff.classList.toggle('active',    role === 'staff');
         staffSection.classList.toggle('visible', role === 'staff');
+        // Show address section only for customers
+        addrSection.classList.toggle('hidden', role === 'staff');
         submitLabel.textContent = role === 'staff' ? 'Create Staff Account' : 'Create Account';
     }
 
     btnCustomer.addEventListener('click', () => setRole('customer'));
     btnStaff.addEventListener('click',    () => setRole('staff'));
-
-    // Preserve role on error reload
     setRole(roleInput.value || 'customer');
 
-    // Password show/hide
+    // ── Password show/hide ───────────────────────────────────────────────────
     document.querySelectorAll('.toggle-pw').forEach(btn => {
         btn.addEventListener('click', function () {
             const inp  = document.getElementById(this.dataset.target);
@@ -605,7 +637,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         });
     });
 
-    // Password strength
+    // ── Password strength ─────────────────────────────────────────────────────
     const pwInput = document.getElementById('pw');
     const fill    = document.getElementById('strengthFill');
     const colors  = ['#ff5e5e', '#f0a030', '#f0c040', '#5effa3'];
@@ -617,8 +649,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (/[A-Z]/.test(v))           score++;
         if (/[0-9]/.test(v))           score++;
         if (/[@$!%*?&_\-#]/.test(v))   score++;
-        fill.style.width    = (score * 25) + '%';
+        fill.style.width      = (score * 25) + '%';
         fill.style.background = colors[score - 1] || 'transparent';
+    });
+
+    // ── PSGC Address Dropdowns (Registration) ────────────────────────────────
+    const regProvince = document.getElementById('reg-province');
+    const regCity     = document.getElementById('reg-city');
+    const regBarangay = document.getElementById('reg-barangay');
+    const manualWrap  = document.getElementById('reg-manual-wrap');
+
+    // Saved values from PHP (to re-select after error reload)
+    const savedProvince = <?= json_encode($addrProvince) ?>;
+    const savedCity     = <?= json_encode($addrCity) ?>;
+    const savedBarangay = <?= json_encode($addrBarangay) ?>;
+
+    function makeOption(value, text, dataCode) {
+        const opt       = document.createElement('option');
+        opt.value       = value;
+        opt.textContent = text;
+        if (dataCode) opt.dataset.code = dataCode;
+        return opt;
+    }
+
+    function clearSelect(sel, placeholder) {
+        sel.innerHTML = '';
+        sel.appendChild(makeOption('', placeholder));
+    }
+
+    // Load provinces
+    fetch('../customer/ajax/get-provinces.php')
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(provinces => {
+            clearSelect(regProvince, 'Select Province');
+            provinces.forEach(p => regProvince.appendChild(makeOption(p.name, p.name, p.code)));
+
+            // Re-select saved province after error reload
+            if (savedProvince) {
+                const opt = [...regProvince.options].find(o => o.value === savedProvince);
+                if (opt) {
+                    regProvince.value = savedProvince;
+                    regProvince.dispatchEvent(new Event('change'));
+                }
+            }
+        })
+        .catch(() => {
+            clearSelect(regProvince, 'Unavailable');
+            regProvince.disabled = true;
+            regCity.disabled     = true;
+            regBarangay.disabled = true;
+            manualWrap.style.display = 'block';
+        });
+
+    regProvince.addEventListener('change', function () {
+        const code = this.options[this.selectedIndex]?.dataset.code;
+        clearSelect(regCity, 'Loading...');
+        clearSelect(regBarangay, 'Select city first');
+        regCity.disabled     = true;
+        regBarangay.disabled = true;
+
+        if (!code) return;
+
+        fetch('../customer/ajax/get-cities.php?province_code=' + encodeURIComponent(code))
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(cities => {
+                clearSelect(regCity, 'Select City / Municipality');
+                cities.forEach(c => regCity.appendChild(makeOption(c.name, c.name, c.code)));
+                regCity.disabled = false;
+
+                if (savedCity) {
+                    const opt = [...regCity.options].find(o => o.value === savedCity);
+                    if (opt) {
+                        regCity.value = savedCity;
+                        regCity.dispatchEvent(new Event('change'));
+                    }
+                }
+            })
+            .catch(() => { clearSelect(regCity, 'Failed to load cities'); });
+    });
+
+    regCity.addEventListener('change', function () {
+        const code = this.options[this.selectedIndex]?.dataset.code;
+        clearSelect(regBarangay, 'Loading...');
+        regBarangay.disabled = true;
+
+        if (!code) return;
+
+        fetch('../customer/ajax/get-barangays.php?city_code=' + encodeURIComponent(code))
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(barangays => {
+                clearSelect(regBarangay, 'Select Barangay');
+                barangays.forEach(b => regBarangay.appendChild(makeOption(b.name, b.name)));
+                regBarangay.disabled = false;
+
+                if (savedBarangay) {
+                    const opt = [...regBarangay.options].find(o => o.value === savedBarangay);
+                    if (opt) regBarangay.value = savedBarangay;
+                }
+            })
+            .catch(() => { clearSelect(regBarangay, 'Failed to load barangays'); });
     });
 })();
 </script>

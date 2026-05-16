@@ -14,7 +14,7 @@ require_once '../classes/ShippingService.php';
 require_once '../classes/User.php';
 
 if (!User::isLoggedIn() || $_SESSION['user_role'] !== 'customer') {
-    header("Location: ../login.php");
+    header("Location: ../auth/login.php");
     exit;
 }
 
@@ -78,18 +78,24 @@ foreach ($cartItems as &$item) {
 }
 unset($item);
 
-$subtotal   = (float) array_sum(array_column($cartItems, 'line_total'));
-$grandTotal = $subtotal + CHECKOUT_SHIPPING;
+$subtotal = (float) array_sum(array_column($cartItems, 'line_total'));
 
+// ── Fetch user profile + saved address ──────────────────────────────────────
 $userId = (int)$_SESSION['user_id'];
-$stmt   = $pdo->prepare("SELECT firstname, lastname, email, phone FROM users WHERE id = ? LIMIT 1");
+$stmt   = $pdo->prepare("
+    SELECT firstname, lastname, email, phone,
+           address_street, address_barangay, address_city,
+           address_province, address_postal
+    FROM   users
+    WHERE  id = ? LIMIT 1
+");
 $stmt->execute([$userId]);
 $userDefaults = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
 // ── Restore form data if customer returned from a failed/cancelled payment ──
-$pendingOrder      = $_SESSION['pending_order'] ?? null;
-$pendingFormData   = ($pendingOrder['returned'] ?? false) ? ($pendingOrder['form_data'] ?? []) : [];
-$pendingPayment    = $pendingFormData['payment'] ?? '';
+$pendingOrder    = $_SESSION['pending_order'] ?? null;
+$pendingFormData = ($pendingOrder['returned'] ?? false) ? ($pendingOrder['form_data'] ?? []) : [];
+$pendingPayment  = $pendingFormData['payment'] ?? '';
 
 $defaultFirstName = $pendingFormData['firstname'] ?? $userDefaults['firstname'] ?? '';
 $defaultLastName  = $pendingFormData['lastname']  ?? $userDefaults['lastname']  ?? '';
@@ -97,8 +103,23 @@ $defaultEmail     = $pendingFormData['email']     ?? $userDefaults['email']     
 $defaultPhone     = $pendingFormData['phone']     ?? $userDefaults['phone']     ?? '';
 $defaultNotes     = $pendingFormData['notes']     ?? '';
 
-// If returned from failed payment, default to COD so they can place the order immediately
-$defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingPayment !== 'maya')
+// ── Saved address defaults (pre-fill from profile) ──────────────────────────
+$defaultStreet   = $pendingFormData['street_address'] ?? $userDefaults['address_street']   ?? '';
+$defaultBarangay = $pendingFormData['barangay']       ?? $userDefaults['address_barangay'] ?? '';
+$defaultCity     = $pendingFormData['city']           ?? $userDefaults['address_city']     ?? '';
+$defaultProvince = $pendingFormData['province']       ?? $userDefaults['address_province'] ?? '';
+$defaultPostal   = $pendingFormData['postal_code']    ?? $userDefaults['address_postal']   ?? '';
+
+// ── Calculate correct shipping fee from saved province ──────────────────────
+// This ensures the order summary already shows the right fee on page load
+// instead of defaulting to Metro Manila until JS finishes loading.
+$initialShipping = !empty($defaultProvince)
+    ? ShippingService::calculate($defaultProvince)
+    : CHECKOUT_SHIPPING;
+$grandTotal = $subtotal + $initialShipping;
+
+// If returned from failed payment, default to COD
+$defaultPayment = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingPayment !== 'maya')
     ? $pendingPayment
     : 'cod';
 ?>
@@ -116,8 +137,15 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
         .checkout-card  { border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-radius: 12px; }
         .sticky-summary { position: sticky; top: 20px; }
         .required-mark  { color: #dc3545; }
-        /* Manual fallback textarea — hidden by default */
         #manual-address-wrap { display: none; }
+        /* Saved address badge */
+        .saved-address-badge {
+            display: inline-flex; align-items: center; gap: .4rem;
+            background: #d1fae5; color: #065f46;
+            border-radius: 6px; padding: .25rem .65rem;
+            font-size: .8rem; font-weight: 500;
+            margin-bottom: .75rem;
+        }
     </style>
 </head>
 <body>
@@ -146,16 +174,15 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                     </div>
                 </div>
                 <?php endif; ?>
+
                 <input type="hidden" name="csrf_token"
                        value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                 <input type="hidden" name="selected_items"
                        value="<?= htmlspecialchars(implode(',', array_column($cartItems, 'product_id'))) ?>">
                 <input type="hidden" name="selected_qtys"
                        value="<?= htmlspecialchars(implode(',', array_column($cartItems, 'quantity'))) ?>">
-                <!-- Shipping fee updated by JS when province is selected -->
                 <input type="hidden" name="shipping_fee"
-                       id="dynamic-shipping-fee" value="<?= CHECKOUT_SHIPPING ?>">
-                <!-- Combined address populated by JS — falls back to manual textarea -->
+                       id="dynamic-shipping-fee" value="<?= $initialShipping ?>">
                 <input type="hidden" name="shipping_address" id="combined-address">
 
                 <!-- Shipping Information -->
@@ -212,8 +239,14 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                                 <label class="form-label">
                                     Street Address <span class="required-mark">*</span>
                                 </label>
+                                <?php if (!empty($defaultStreet)): ?>
+                                    <div class="saved-address-badge">
+                                        <i class="fas fa-check-circle"></i> Pre-filled from your profile
+                                    </div>
+                                <?php endif; ?>
                                 <input type="text" class="form-control" name="street_address"
                                        id="street_address"
+                                       value="<?= htmlspecialchars($defaultStreet) ?>"
                                        placeholder="House/Unit No., Street Name"
                                        maxlength="200" required>
                                 <div class="invalid-feedback">Please enter your street address.</div>
@@ -224,10 +257,6 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                                 <label class="form-label">
                                     Province <span class="required-mark">*</span>
                                 </label>
-                                <!--
-                                    NOTE: NOT marked required here — we validate
-                                    via JS before submit to avoid disabled-select issues
-                                -->
                                 <select class="form-select" id="province-select" name="province">
                                     <option value="">Loading provinces...</option>
                                 </select>
@@ -266,10 +295,11 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                             <div class="col-md-6">
                                 <label class="form-label">Postal Code</label>
                                 <input type="text" class="form-control" name="postal_code"
+                                       value="<?= htmlspecialchars($defaultPostal) ?>"
                                        placeholder="e.g. 1234" maxlength="10">
                             </div>
 
-                            <!-- Manual fallback — shown only when PSGC fails -->
+                            <!-- Manual fallback -->
                             <div class="col-12" id="manual-address-wrap">
                                 <div class="alert alert-warning py-2 mb-2">
                                     <i class="fas fa-exclamation-triangle me-2"></i>
@@ -285,10 +315,14 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                                 <div class="alert alert-info py-2 mb-0" id="shipping-info">
                                     <i class="fas fa-truck me-2"></i>
                                     Shipping fee: <strong id="shipping-fee-display">
-                                        ₱<?= number_format(CHECKOUT_SHIPPING, 2) ?>
+                                        &#8369;<?= number_format($initialShipping, 2) ?>
                                     </strong>
-                                    <small class="text-muted d-block">
-                                        Select your province for exact rate
+                                    <small class="text-muted d-block" id="shipping-fee-label">
+                                        <?php if (!empty($defaultProvince)): ?>
+                                           
+                                        <?php else: ?>
+                                            Select your province for exact rate
+                                        <?php endif; ?>
                                     </small>
                                 </div>
                             </div>
@@ -429,7 +463,7 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                     <div class="d-flex justify-content-between mb-3">
                         <span>Shipping</span>
                         <span class="shipping-summary-value">
-                            &#8369;<?= number_format(CHECKOUT_SHIPPING, 2) ?>
+                            &#8369;<?= number_format($initialShipping, 2) ?>
                         </span>
                     </div>
                     <hr>
@@ -468,16 +502,18 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
     const manualWrap      = document.getElementById('manual-address-wrap');
     const manualTextarea  = document.getElementById('manual-address');
 
-    // Track whether PSGC loaded successfully
+    // ── Saved address from PHP (pre-fill from profile) ───────────────────────
+    const savedProvince = <?= json_encode($defaultProvince) ?>;
+    const savedCity     = <?= json_encode($defaultCity) ?>;
+    const savedBarangay = <?= json_encode($defaultBarangay) ?>;
+
     let psgcAvailable = false;
     let submitted     = false;
 
-    // ── Safely create an <option> element to avoid innerHTML XSS/crash ──────
-    // fixed: was using innerHTML += which breaks on names with quotes/special chars
     function makeOption(value, text, dataCode) {
         const opt = document.createElement('option');
         opt.value       = value;
-        opt.textContent = text;          // safe — no HTML parsing
+        opt.textContent = text;
         if (dataCode) opt.dataset.code = dataCode;
         return opt;
     }
@@ -494,17 +530,22 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
             return r.json();
         })
         .then(provinces => {
-            if (!Array.isArray(provinces) || provinces.length === 0) {
-                throw new Error('Empty response');
-            }
+            if (!Array.isArray(provinces) || provinces.length === 0) throw new Error('Empty');
             psgcAvailable = true;
             clearSelect(provinceSelect, 'Select Province');
-            provinces.forEach(p => {
-                provinceSelect.appendChild(makeOption(p.name, p.name, p.code));
-            });
+            provinces.forEach(p => provinceSelect.appendChild(makeOption(p.name, p.name, p.code)));
+
+            // ── Auto-select saved province ───────────────────────────────────
+            if (savedProvince) {
+                const opt = [...provinceSelect.options].find(o => o.value === savedProvince);
+                if (opt) {
+                    provinceSelect.value = savedProvince;
+                    // Trigger cascade to load cities + auto-select saved city
+                    provinceSelect.dispatchEvent(new Event('change'));
+                }
+            }
         })
         .catch(() => {
-            // PSGC failed — show manual textarea fallback
             psgcAvailable = false;
             clearSelect(provinceSelect, 'Address lookup unavailable');
             provinceSelect.disabled = true;
@@ -520,7 +561,6 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
 
         clearSelect(citySelect,    'Loading...');
         citySelect.disabled = true;
-
         clearSelect(barangaySelect, 'Select city first');
         barangaySelect.disabled = true;
 
@@ -530,20 +570,23 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
         if (!code) return;
 
         fetch('ajax/get-cities.php?province_code=' + encodeURIComponent(code))
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
             .then(cities => {
                 clearSelect(citySelect, 'Select City / Municipality');
-                cities.forEach(c => {
-                    citySelect.appendChild(makeOption(c.name, c.name, c.code));
-                });
+                cities.forEach(c => citySelect.appendChild(makeOption(c.name, c.name, c.code)));
                 citySelect.disabled = false;
+
+                // ── Auto-select saved city ───────────────────────────────────
+                if (savedCity) {
+                    const opt = [...citySelect.options].find(o => o.value === savedCity);
+                    if (opt) {
+                        citySelect.value = savedCity;
+                        citySelect.dispatchEvent(new Event('change'));
+                    }
+                }
             })
             .catch(() => {
                 clearSelect(citySelect, 'Failed to load cities');
-                // Show manual fallback if cities fail too
                 manualWrap.style.display = 'block';
             });
     });
@@ -561,16 +604,20 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
         if (!code) return;
 
         fetch('ajax/get-barangays.php?city_code=' + encodeURIComponent(code))
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
             .then(barangays => {
                 clearSelect(barangaySelect, 'Select Barangay');
-                barangays.forEach(b => {
-                    barangaySelect.appendChild(makeOption(b.name, b.name));
-                });
+                barangays.forEach(b => barangaySelect.appendChild(makeOption(b.name, b.name)));
                 barangaySelect.disabled = false;
+
+                // ── Auto-select saved barangay ───────────────────────────────
+                if (savedBarangay) {
+                    const opt = [...barangaySelect.options].find(o => o.value === savedBarangay);
+                    if (opt) {
+                        barangaySelect.value = savedBarangay;
+                        updateCombinedAddress();
+                    }
+                }
             })
             .catch(() => {
                 clearSelect(barangaySelect, 'Failed to load barangays');
@@ -588,7 +635,6 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
         let address;
 
         if (!psgcAvailable || manualWrap.style.display !== 'none') {
-            // Manual fallback — combine street + textarea
             const street = document.getElementById('street_address').value.trim();
             const manual = manualTextarea.value.trim();
             address = [street, manual].filter(Boolean).join(', ');
@@ -609,16 +655,19 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
         if (!province) return;
 
         fetch('ajax/get-shipping-rate.php?province=' + encodeURIComponent(province))
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
             .then(data => {
-                const rate  = parseFloat(data.rate) || <?= CHECKOUT_SHIPPING ?>;
+                const rate  = parseFloat(data.rate) || <?= $initialShipping ?>;
                 const grand = <?= $subtotal ?> + rate;
 
                 document.getElementById('shipping-fee-display').textContent =
                     '₱' + rate.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
+                // Update the label to show which province the rate is based on
+                const label = document.getElementById('shipping-fee-label');
+                if (label) {
+                    label.innerHTML = 'Rate for <strong>' + province + '</strong>';
+                }
 
                 const summaryShipping = document.querySelector('.shipping-summary-value');
                 if (summaryShipping) {
@@ -634,25 +683,19 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
 
                 document.getElementById('dynamic-shipping-fee').value = rate.toFixed(2);
             })
-            .catch(() => {
-                // Silently keep default rate — don't crash
-            });
+            .catch(() => {});
     }
 
-    // ── Form validation (manual, not Bootstrap's built-in) ───────────────────
-    // fixed: Bootstrap skips disabled selects so we validate address manually
+    // ── Form validation ──────────────────────────────────────────────────────
     form.addEventListener('submit', function (e) {
-        // Always update combined address right before submit
         updateCombinedAddress();
 
         let valid = true;
 
-        // 1. Standard HTML5 validation (name, email, phone, street)
         if (!form.checkValidity()) {
             e.preventDefault();
             e.stopPropagation();
             form.classList.add('was-validated');
-
             const firstInvalid = form.querySelector(':invalid:not([type="hidden"])');
             if (firstInvalid) {
                 firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -661,9 +704,7 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
             valid = false;
         }
 
-        // 2. Address validation — province/city/barangay or manual textarea
         if (psgcAvailable && manualWrap.style.display === 'none') {
-            // PSGC dropdowns loaded — require selections
             if (!provinceSelect.value) {
                 document.getElementById('province-error').style.display = 'block';
                 provinceSelect.classList.add('is-invalid');
@@ -692,7 +733,6 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
                 barangaySelect.classList.remove('is-invalid');
             }
         } else {
-            // Manual fallback — require the textarea
             const manual = manualTextarea.value.trim();
             if (!manual) {
                 manualTextarea.classList.add('is-invalid');
@@ -703,18 +743,14 @@ $defaultPayment   = ($pendingPayment && $pendingPayment !== 'gcash' && $pendingP
             }
         }
 
-        // 3. Final check — combined address must not be empty
         if (!combinedAddr.value.trim()) {
-            if (valid) {
-                alert('Please complete your shipping address before proceeding.');
-            }
+            if (valid) alert('Please complete your shipping address before proceeding.');
             e.preventDefault();
             valid = false;
         }
 
         if (!valid) return;
 
-        // Prevent double-submit
         if (submitted) { e.preventDefault(); return; }
         submitted = true;
         submitBtn.disabled = true;

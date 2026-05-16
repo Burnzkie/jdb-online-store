@@ -24,9 +24,15 @@ class User
         string  $phone,
         string  $email,
         string  $password,
-        string  $role     = 'customer',
-        ?string $staffId  = null,
-        ?string $position = null
+        string  $role            = 'customer',
+        ?string $staffId         = null,
+        ?string $position        = null,
+        // ── Address fields (optional — customers only) ──
+        ?string $addressStreet   = null,
+        ?string $addressBarangay = null,
+        ?string $addressCity     = null,
+        ?string $addressProvince = null,
+        ?string $addressPostal   = null
     ): array {
         // Duplicate e-mail check
         $stmt = $this->pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
@@ -47,14 +53,25 @@ class User
 
         $stmt = $this->pdo->prepare("
             INSERT INTO users
-                (firstname, lastname, phone, email, password_hash, role, staff_id, position, created_at)
+                (firstname, lastname, phone, email, password_hash, role,
+                 staff_id, position,
+                 address_street, address_barangay, address_city,
+                 address_province, address_postal,
+                 created_at)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (?, ?, ?, ?, ?, ?,
+                 ?, ?,
+                 ?, ?, ?,
+                 ?, ?,
+                 NOW())
         ");
         $result = $stmt->execute([
             $firstname, $lastname, $phone, $email,
             Security::hashPassword($password),
-            $role, $staffId, $position,
+            $role,
+            $staffId, $position,
+            $addressStreet, $addressBarangay, $addressCity,
+            $addressProvince, $addressPostal,
         ]);
 
         return $result
@@ -108,6 +125,58 @@ class User
         }
     }
 
+    // ─── Address ──────────────────────────────────────────────────────────────
+
+    /**
+     * Get the saved address for a user.
+     * Returns an array with keys: street, barangay, city, province, postal.
+     */
+    public function getAddress(int $userId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT address_street   AS street,
+                   address_barangay AS barangay,
+                   address_city     AS city,
+                   address_province AS province,
+                   address_postal   AS postal
+            FROM   users
+            WHERE  id = ?
+            LIMIT  1
+        ");
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Save or update the address for a user.
+     */
+    public function updateAddress(
+        int     $userId,
+        ?string $street   = null,
+        ?string $barangay = null,
+        ?string $city     = null,
+        ?string $province = null,
+        ?string $postal   = null
+    ): bool {
+        return $this->pdo->prepare("
+            UPDATE users
+            SET    address_street   = :street,
+                   address_barangay = :barangay,
+                   address_city     = :city,
+                   address_province = :province,
+                   address_postal   = :postal,
+                   updated_at       = NOW()
+            WHERE  id = :id
+        ")->execute([
+            ':street'   => $street,
+            ':barangay' => $barangay,
+            ':city'     => $city,
+            ':province' => $province,
+            ':postal'   => $postal,
+            ':id'       => $userId,
+        ]);
+    }
+
     // ─── Static helpers ───────────────────────────────────────────────────────
 
     public static function isLoggedIn(): bool
@@ -151,6 +220,8 @@ class User
         $stmt = $this->pdo->prepare("
             SELECT id, firstname, lastname, email, phone, role,
                    password_hash, staff_id, position, profile_picture,
+                   address_street, address_barangay, address_city,
+                   address_province, address_postal,
                    created_at, updated_at, email_verified, is_banned
             FROM   users
             WHERE  id = ?
