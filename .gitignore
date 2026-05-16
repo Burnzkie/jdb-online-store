@@ -1,2 +1,13 @@
+# Environment
+.env
+
+# Dependencies
 vendor/
-.env/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
