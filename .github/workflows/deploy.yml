@@ -1,0 +1,32 @@
+name: Deploy to InfinityFree via FTP
+
+on:
+  push:
+    branches:
+      - main  # Change this if your default branch is 'master'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ftpupload.net
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
+          local-dir: ./
+          server-dir: /htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .env
+            .env.production
+            .env.local
+            README.md
+            /node_modules/**

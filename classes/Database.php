@@ -5,8 +5,11 @@ declare(strict_types=1);
 /**
  * Database — singleton PDO wrapper.
  *
- * Loads configuration from a .env file located at the project root.
- * Falls back to environment variables, then safe local defaults.
+ * Automatically detects environment (local vs production)
+ * and loads the appropriate .env file.
+ *
+ * - Local (XAMPP):    loads .env
+ * - Production (InfinityFree): loads .env.production
  */
 class Database
 {
@@ -46,30 +49,44 @@ class Database
     }
 
     /**
-     * Loads key=value pairs from the nearest .env file into $_ENV.
-     * Searches from this file's directory up to the project root.
-     * Skips lines that are blank or start with #.
+     * Detects if the app is running on localhost/XAMPP.
+     */
+    private static function isLocal(): bool
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+        return in_array($host, ['localhost', '127.0.0.1'], true)
+            || str_starts_with($host, 'localhost:');
+    }
+
+    /**
+     * Loads the appropriate .env file based on the environment.
+     * - Local:      .env
+     * - Production: .env.production
+     *
+     * Searches up to 5 directory levels from this file's location.
      * Already-set values are NOT overwritten.
      */
     private static function loadEnv(): void
     {
-        // Walk up the directory tree to find .env
-        $dir = __DIR__;
+        $envFileName = self::isLocal() ? '.env' : '.env.production';
+
+        // Walk up the directory tree to find the env file
+        $dir     = __DIR__;
         $envFile = null;
 
         for ($i = 0; $i < 5; $i++) {
-            $candidate = $dir . DIRECTORY_SEPARATOR . '.env';
+            $candidate = $dir . DIRECTORY_SEPARATOR . $envFileName;
             if (file_exists($candidate)) {
                 $envFile = $candidate;
                 break;
             }
             $parent = dirname($dir);
-            if ($parent === $dir) break; // reached filesystem root
+            if ($parent === $dir) break;
             $dir = $parent;
         }
 
         if ($envFile === null) {
-            error_log('[DB] .env file not found. Using defaults or system env vars.');
+            error_log("[DB] {$envFileName} not found. Using defaults or system env vars.");
             return;
         }
 
@@ -78,12 +95,10 @@ class Database
         foreach ($lines as $line) {
             $line = trim($line);
 
-            // Skip comments and empty lines
             if ($line === '' || str_starts_with($line, '#')) {
                 continue;
             }
 
-            // Must contain an = sign
             if (!str_contains($line, '=')) {
                 continue;
             }
@@ -103,7 +118,6 @@ class Database
                 $value = substr($value, 1, -1);
             }
 
-            // Only set if not already defined
             if (!isset($_ENV[$key])) {
                 $_ENV[$key] = $value;
                 putenv("$key=$value");
