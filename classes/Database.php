@@ -68,7 +68,7 @@ class Database
      */
     private static function loadEnv(): void
     {
-        $envFileName = self::isLocal() ? '.env' : '.env.production';
+        $envFileName = self::isLocal() ? '.env' : 'env.production';
 
         // Walk up the directory tree to find the env file
         $dir     = __DIR__;

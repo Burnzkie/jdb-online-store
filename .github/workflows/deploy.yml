@@ -27,6 +27,6 @@ jobs:
             **/.git*/**
             .env
             .env.production
-            .env.local
+            env.production
             README.md
             /node_modules/**
