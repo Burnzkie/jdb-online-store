@@ -31,13 +31,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Orders — JDB Parts</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <?php $pageTitle = 'My Orders — JDB Parts'; require_once __DIR__ . '/partials/head.php'; ?>
     <style>
         :root{--primary:#1a56db;--primary-dark:#1344b4;--primary-soft:#eff4ff;--success:#0e9f6e;--success-soft:#f0fdf9;--danger:#e02424;--danger-soft:#fff5f5;--warning:#d97706;--warning-soft:#fffbeb;--surface:#fff;--bg:#f4f6fb;--border:#e5e9f2;--text:#111827;--muted:#6b7280;--radius:14px;--radius-sm:9px;}
         *{box-sizing:border-box;margin:0;padding:0;}

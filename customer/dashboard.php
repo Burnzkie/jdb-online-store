@@ -55,6 +55,7 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+     <?php $pageTitle = 'Page Title — JDB Parts'; require_once __DIR__ . '/partials/head.php'; ?>
     <style>
         :root {
             --primary:#1a56db; --primary-dark:#1344b4; --primary-soft:#eff4ff;
