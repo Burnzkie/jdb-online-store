@@ -27,7 +27,7 @@ class Database
         $port = (int)($_ENV['DB_PORT'] ?? 3306);
 
         $dsn = sprintf(
-            'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+            'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4;connect_timeout=10',
             $host, $port, $db
         );
 
