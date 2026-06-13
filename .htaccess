@@ -1,0 +1,19 @@
+# .htaccess
+# Placed at project root.
+# Redirects bare domain root to auth/login.php.
+# Also prevents direct access to sensitive files.
+
+Options -Indexes
+RewriteEngine On
+
+# ── Redirect root to login ────────────────────────────────────────────────────
+RewriteRule ^$ auth/login.php [L,R=302]
+
+# ── Block access to sensitive files ──────────────────────────────────────────
+RewriteRule ^\.env$              - [F,L]
+RewriteRule ^env\.production$    - [F,L]
+RewriteRule ^ca\.pem$            - [F,L]
+RewriteRule ^config/.*\.php$     - [F,L]
+RewriteRule ^classes/.*\.php$    - [F,L]
+RewriteRule ^docker-entrypoint   - [F,L]
+RewriteRule ^Dockerfile          - [F,L]

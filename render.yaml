@@ -1,0 +1,99 @@
+# render.yaml
+# Render deployment config for JDB Parts.
+# Place this at your project root.
+# Render reads this file automatically on deploy.
+
+services:
+  - type: web
+    name: jdbshop
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+
+    # Health check — Render pings this to confirm the app is up
+    healthCheckPath: /auth/login.php
+
+    # All sensitive values must be set in Render dashboard → Environment
+    # The values below are placeholders only (sync: false = not auto-synced)
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      - key: APP_DEBUG
+        value: "false"
+
+      # ── Aiven MySQL ───────────────────────────────────────────────────────
+      - key: DB_HOST
+        sync: false   # Set in Render dashboard
+
+      - key: DB_PORT
+        value: "16431"
+
+      - key: DB_NAME
+        value: defaultdb
+
+      - key: DB_USER
+        value: avnadmin
+
+      - key: DB_PASS
+        sync: false   # Set in Render dashboard
+
+      # ── Aiven CA cert (base64-encoded) ────────────────────────────────────
+      - key: AIVEN_CA_CERT
+        sync: false   # Set in Render dashboard
+
+      # ── PayMongo ──────────────────────────────────────────────────────────
+      - key: PAYMONGO_SECRET_KEY
+        sync: false
+
+      - key: PAYMONGO_PUBLIC_KEY
+        sync: false
+
+      - key: PAYMONGO_WEBHOOK_SECRET
+        sync: false
+
+      # ── SMTP ──────────────────────────────────────────────────────────────
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+
+      - key: SMTP_PORT
+        value: "587"
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASS
+        sync: false
+
+      - key: SMTP_FROM
+        value: noreply@jdbparts.com
+
+      # ── Google OAuth ──────────────────────────────────────────────────────
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+
+      # ── Facebook OAuth ────────────────────────────────────────────────────
+      - key: FB_CLIENT_ID
+        sync: false
+
+      - key: FB_CLIENT_SECRET
+        sync: false
+
+      - key: FB_REDIRECT_URI
+        sync: false
+
+      # ── GitHub OAuth ──────────────────────────────────────────────────────
+      - key: GITHUB_CLIENT_ID
+        sync: false
+
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+
+      - key: GITHUB_REDIRECT_URI
+        sync: false

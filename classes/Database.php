@@ -2,15 +2,6 @@
 
 declare(strict_types=1);
 
-/**
- * Database — singleton PDO wrapper.
- *
- * Automatically detects environment (local vs production)
- * and loads the appropriate .env file.
- *
- * - Local (XAMPP):    loads .env
- * - Production (InfinityFree): loads .env.production
- */
 class Database
 {
     private static ?self $instance = null;
@@ -36,7 +27,9 @@ class Database
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
             PDO::ATTR_PERSISTENT         => false,
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
+            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => self::isLocal() ? false : true,
+            PDO::MYSQL_ATTR_SSL_CA => self::isLocal() ? '' : ($_ENV['DB_SSL_CA'] ?? ''),
+             PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
         ];
 
         try {
@@ -48,29 +41,18 @@ class Database
         }
     }
 
-    /**
-     * Detects if the app is running on localhost/XAMPP.
-     */
+   
     private static function isLocal(): bool
     {
-        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
-        return in_array($host, ['localhost', '127.0.0.1'], true)
-            || str_starts_with($host, 'localhost:');
+        return ($ENV['APP_ENV'] ??  getenv('APP_ENV') ?? 'production') === 'local';
     }
 
-    /**
-     * Loads the appropriate .env file based on the environment.
-     * - Local:      .env
-     * - Production: .env.production
-     *
-     * Searches up to 5 directory levels from this file's location.
-     * Already-set values are NOT overwritten.
-     */
+    
     private static function loadEnv(): void
     {
         $envFileName = self::isLocal() ? '.env' : 'env.production';
 
-        // Walk up the directory tree to find the env file
+        
         $dir     = __DIR__;
         $envFile = null;
 
@@ -107,7 +89,7 @@ class Database
             $key   = trim($key);
             $value = trim($value);
 
-            // Strip surrounding quotes (single or double)
+           
             if (
                 strlen($value) >= 2 &&
                 (
@@ -125,7 +107,7 @@ class Database
         }
     }
 
-    /** Prevent cloning */
+   
     private function __clone() {}
 
     /** Prevent unserialization */
