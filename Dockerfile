@@ -23,7 +23,7 @@ RUN a2enmod rewrite
 RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html|g' \
     /etc/apache2/sites-available/000-default.conf
 
-RUN echo '<Directory /var/www/html>\n\
+RUN printf '<Directory /var/www/html>\n\
     Options -Indexes +followSymLinks\n\
     AllowOverride All\n\
     Require all granted\n\
