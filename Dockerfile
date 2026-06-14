@@ -1,6 +1,6 @@
 
 FROM php:8.3-apache
-───────────────────────────────────────────────────────
+
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-────────────────────────────────────────────────────────────
+
 RUN docker-php-ext-install \
     pdo \
     pdo_mysql \
@@ -30,13 +30,13 @@ RUN echo '<Directory /var/www/html>\n\
     </Directory>' > /etc/apache2/conf-available/jdb-override.conf \
     && a2enconf jdb-override
 
-────────────────────────────────────────────────────────────────
+
 RUN echo "upload_max_filesize = 10M" >> /usr/local/etc/php/conf.d/custom.ini \
     && echo "post_max_size = 12M"    >> /usr/local/etc/php/conf.d/custom.ini \
     && echo "display_errors = Off"   >> /usr/local/etc/php/conf.d/custom.ini \
     && echo "log_errors = On"        >> /usr/local/etc/php/conf.d/custom.ini
 
-──────────────────────────────────────────────────────
+
 COPY . /var/www/html/
 
 RUN mkdir -p /var/www/html/uploads/products \
