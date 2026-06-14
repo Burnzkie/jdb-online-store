@@ -20,8 +20,16 @@ RUN docker-php-ext-install \
 
 RUN a2enmod rewrite
 
-RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html|g' \
-    /etc/apache2/sites-available/000-default.conf
+Run sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html|g'\
+    \etc/apache2/sites-available/000-default.conf && \
+    sed -i '/<\/VirtualHost>/i \
+    <Directory /var/www/html>\
+        Options -Indexes +FollowSymLinks\
+        AllowOverride All\
+        Require all granted\
+        </Directory>\
+        RedirectMatch ^/$ /auth/login.php' \
+        /etc/apache2/sites-available/000-default.conf
 
 RUN printf '<Directory /var/www/html>\n\
     Options -Indexes +followSymLinks\n\
