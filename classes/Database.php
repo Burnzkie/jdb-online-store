@@ -44,7 +44,7 @@ class Database
    
     private static function isLocal(): bool
     {
-        return ($ENV['APP_ENV'] ??  getenv('APP_ENV') ?? 'production') === 'local';
+        return ($_ENV['APP_ENV'] ??  getenv('APP_ENV') ?? 'production') === 'local';
     }
 
     
