@@ -1,7 +1,6 @@
 # Environment
 .env
 .env.production
-config/oauth.php
 
 # Dependencies
 vendor/
